@@ -1,4 +1,4 @@
-shinylive==0.10.7
+shinylive
 shiny
 numpy
 matplotlib
