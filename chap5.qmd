@@ -1,0 +1,206 @@
+---
+title: "5. Die Wissens-Revision"
+format: html
+---
+
+## Zeit: 30 min | Schwierigkeit: Fortgeschritten
+
+### Wissenschaft als Änderung von Überzeugungen
+Im Kern beschreibt Wissenschaft einen Lernprozess: Wir starten mit einer Vermutung, sammeln Daten und passen unsere Überzeugung an die Daten an. Bis in die Renaissance galt die Erde als Mittelpunkt des Universums. Diese Hypothese war damals die plausibelste. Mit zunehmend genaueren astronomischen Beobachtungen wurden die Daten unter der Erdmittelpunkts-Annahme aber immer unwahrscheinlicher, sodass sich die wissenschaftliche Überzeugung nach und nach verschob.
+
+Genau dieses Prinzip formalisiert die bayesianische Statistik. Eine Hypothese hat vor der Datensammlung eine bestimmte Wahrscheinlichkeit (Prior), die durch die Daten in eine neue Wahrscheinlichkeit (Posterior) revidiert wird. Forschungsfortschritt ist Wahrscheinlichkeitsrevision.
+
+### Das Bayes-Theorem
+Die zentrale Formel lautet:
+
+$$P(H \mid D) = \frac{P(D \mid H) \cdot P(H)}{P(D)}$$
+
+Die Bestandteile:
+
+- $P(H)$ ist die Prior-Wahrscheinlichkeit der Hypothese, also unsere Überzeugung vor der Datensammlung.
+- $P(D \mid H)$ ist die Likelihood, also die Wahrscheinlichkeit, die beobachteten Daten unter der Annahme der Hypothese zu sehen.
+- $P(D)$ ist die Gesamtwahrscheinlichkeit der Daten unter allen Hypothesen.
+- $P(H \mid D)$ ist die Posterior-Wahrscheinlichkeit, also unsere revidierte Überzeugung nach der Datensammlung.
+
+Wenn wir Hypothesen über einen kontinuierlichen Parameter aufstellen (etwa: wie hoch ist die Pünktlichkeitsquote von SmartRail?), ersetzen wir die diskrete Prior durch eine Prior-Verteilung, die jedem möglichen Parameterwert eine Wahrscheinlichkeitsdichte zuordnet. Genauso entstehen eine Likelihood-Verteilung und eine Posterior-Verteilung.
+
+### Beispiel SmartRail: Eine skeptische Expertin
+Du möchtest die wahre Pünktlichkeitsquote $\theta$ von SmartRail schätzen. Eine Expertin, die seit Jahren Bahn-Infrastruktur erforscht, ist skeptisch: Sie glaubt, dass $\theta$ irgendwo zwischen 50 % und 70 % liegen wird, mit einem Schwerpunkt bei 60 %. Diese Vermutung formalisieren wir als Beta-Prior:
+
+$$\theta \sim \text{Beta}(\alpha, \beta)$$
+
+mit etwa $\alpha = 12$, $\beta = 8$. Diese Verteilung hat ihren Gipfel bei $\theta \approx 0.6$ und ist mäßig schmal.
+
+Die Likelihood basiert auf Binomialdaten: Bei $n$ beobachteten Fahrten waren $k$ pünktlich. Da Beta die konjugierte Prior für die Binomialverteilung ist, ergibt sich die Posterior elegant als:
+
+$$\theta \mid k \sim \text{Beta}(\alpha + k,\ \beta + n - k)$$
+
+Mit jeder neuen beobachteten Fahrt wachsen $\alpha + k$ oder $\beta + n - k$, und die Posterior-Verteilung wird schmaler. Die Skepsis der Expertin verliert an Gewicht, sobald genug Daten vorliegen, die ihrer Vorerwartung widersprechen.
+
+Die wahre, in der Realität unbekannte Pünktlichkeitsquote von SmartRail liegt in unserer Simulation bei 85 %. Die Expertin liegt also mit ihrer Erwartung deutlich daneben. Wir wollen sehen, wie schnell die Daten ihre Überzeugung revidieren.
+
+### Deine Aufgabe
+Die Applikation simuliert das schrittweise Beobachten von SmartRail-Fahrten und visualisiert Prior, Likelihood und Posterior in Echtzeit.
+
+1. **Prior wählen:** Stelle den Prior der Expertin ein. Du kannst ihren Schwerpunkt verschieben (von skeptisch bis enthusiastisch) und die Stärke ihrer Überzeugung verändern (schmaler Prior = starke Vorannahme; breiter Prior = unsichere Vorannahme).
+2. **Daten sammeln:** Klicke auf „Eine Fahrt beobachten" und sieh, wie sich die Posterior verschiebt. Klicke mehrfach. Anfangs zieht jede einzelne Fahrt die Posterior spürbar, später wird die Bewegung kleiner.
+3. **Schub geben:** Mit den Buttons „10 Fahrten" und „100 Fahrten" beschleunigst du das Lernen. Beobachte: Egal wie skeptisch die Expertin gestartet ist, die Posterior nähert sich langsam der wahren Pünktlichkeitsquote von 85 %.
+4. **Zurücksetzen:** „Zurücksetzen" leert die Beobachtungen. Du kannst dann mit einem neuen Prior von vorne starten und ausprobieren, wie sich verschiedene Vorannahmen auf den Lernpfad auswirken.
+
+```{shinylive-python}
+#| standalone: true
+#| viewerHeight: 750
+
+from shiny import App, render, ui, reactive
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import beta, binom
+
+WAHRE_QUOTE = 0.85
+
+app_ui = ui.page_fluid(
+    ui.card(
+        ui.card_header("Überzeugungs-Update: Bayes lernt SmartRail"),
+        ui.layout_columns(
+            ui.div(
+                ui.h5("Prior der Expertin"),
+                ui.input_slider("prior_mean", "Erwartete Quote (Schwerpunkt)", 0.05, 0.95, 0.6, step=0.05),
+                ui.input_slider("prior_strength", "Stärke der Vorannahme", 2, 80, 20, step=1),
+                ui.hr(),
+                ui.h5("Beobachten"),
+                ui.layout_columns(
+                    ui.input_action_button("obs_1", "Eine Fahrt", class_="btn-primary"),
+                    ui.input_action_button("obs_10", "10 Fahrten", class_="btn-success"),
+                    col_widths=(6, 6),
+                ),
+                ui.layout_columns(
+                    ui.input_action_button("obs_100", "100 Fahrten", class_="btn-warning"),
+                    ui.input_action_button("reset", "Zurücksetzen", class_="btn-danger"),
+                    col_widths=(6, 6),
+                ),
+                ui.hr(),
+                ui.output_ui("status_box"),
+            ),
+            ui.output_plot("bayes_plot"),
+            col_widths=(4, 8)
+        )
+    )
+)
+
+def server(input, output, session):
+
+    daten = reactive.Value({"n": 0, "k": 0, "seed": 0})
+
+    @reactive.Effect
+    @reactive.event(input.obs_1)
+    def beobachte_eine():
+        akt = daten.get()
+        rng = np.random.default_rng(akt["seed"] + akt["n"])
+        neue = rng.binomial(1, WAHRE_QUOTE, 1).sum()
+        daten.set({"n": akt["n"] + 1, "k": akt["k"] + int(neue), "seed": akt["seed"]})
+
+    @reactive.Effect
+    @reactive.event(input.obs_10)
+    def beobachte_zehn():
+        akt = daten.get()
+        rng = np.random.default_rng(akt["seed"] + akt["n"] + 1)
+        neue = rng.binomial(1, WAHRE_QUOTE, 10).sum()
+        daten.set({"n": akt["n"] + 10, "k": akt["k"] + int(neue), "seed": akt["seed"]})
+
+    @reactive.Effect
+    @reactive.event(input.obs_100)
+    def beobachte_hundert():
+        akt = daten.get()
+        rng = np.random.default_rng(akt["seed"] + akt["n"] + 2)
+        neue = rng.binomial(1, WAHRE_QUOTE, 100).sum()
+        daten.set({"n": akt["n"] + 100, "k": akt["k"] + int(neue), "seed": akt["seed"]})
+
+    @reactive.Effect
+    @reactive.event(input.reset)
+    def zuruecksetzen():
+        akt = daten.get()
+        daten.set({"n": 0, "k": 0, "seed": akt["seed"] + 1000})
+
+    @reactive.Calc
+    def prior_params():
+        m = input.prior_mean()
+        s = input.prior_strength()
+        alpha = m * s
+        beta_p = (1 - m) * s
+        return alpha, beta_p
+
+    @render.ui
+    def status_box():
+        d = daten.get()
+        alpha, beta_p = prior_params()
+        post_alpha = alpha + d["k"]
+        post_beta = beta_p + d["n"] - d["k"]
+        if post_alpha + post_beta > 0:
+            post_mean = post_alpha / (post_alpha + post_beta)
+            post_var = (post_alpha * post_beta) / ((post_alpha + post_beta) ** 2 * (post_alpha + post_beta + 1))
+            post_sd = np.sqrt(post_var)
+        else:
+            post_mean = 0.5
+            post_sd = 0
+        return ui.div(
+            ui.h5("Stand der Beobachtungen"),
+            ui.p(f"Beobachtete Fahrten: {d['n']}"),
+            ui.p(f"Davon pünktlich: {d['k']}"),
+            ui.hr(),
+            ui.p(ui.strong(f"Posterior-Mittelwert: {post_mean:.3f}")),
+            ui.p(f"Posterior-Streuung: {post_sd:.3f}"),
+            ui.p(f"Wahre Quote (für dich sichtbar): {WAHRE_QUOTE:.2f}"),
+        )
+
+    @render.plot
+    def bayes_plot():
+        d = daten.get()
+        alpha, beta_p = prior_params()
+        post_alpha = alpha + d["k"]
+        post_beta = beta_p + d["n"] - d["k"]
+
+        x = np.linspace(0.001, 0.999, 400)
+        prior_y = beta.pdf(x, alpha, beta_p)
+        posterior_y = beta.pdf(x, post_alpha, post_beta)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+        ax1.plot(x, prior_y, color="#3498db", linewidth=2.5, label=f"Prior  Beta({alpha:.1f}, {beta_p:.1f})")
+        ax1.fill_between(x, 0, prior_y, color="#3498db", alpha=0.2)
+        ax1.plot(x, posterior_y, color="#27ae60", linewidth=2.5, label=f"Posterior  Beta({post_alpha:.1f}, {post_beta:.1f})")
+        ax1.fill_between(x, 0, posterior_y, color="#27ae60", alpha=0.25)
+        ax1.axvline(WAHRE_QUOTE, color="#c0392b", linestyle="dashed", linewidth=2, label=f"Wahre Quote ({WAHRE_QUOTE:.2f})")
+        ax1.set_ylabel("Dichte")
+        ax1.set_title("Prior vor Datenerhebung; Posterior nach Datenerhebung")
+        ax1.legend(loc="upper left", fontsize=9)
+        ax1.spines['top'].set_visible(False)
+        ax1.spines['right'].set_visible(False)
+
+        if d["n"] > 0:
+            theta_grid = np.linspace(0.001, 0.999, 400)
+            log_lik = d["k"] * np.log(theta_grid) + (d["n"] - d["k"]) * np.log(1 - theta_grid)
+            log_lik -= log_lik.max()
+            lik = np.exp(log_lik)
+            lik /= np.trapz(lik, theta_grid)
+            ax2.plot(theta_grid, lik, color="#e67e22", linewidth=2.5, label=f"Likelihood ({d['k']}/{d['n']} pünktlich)")
+            ax2.fill_between(theta_grid, 0, lik, color="#e67e22", alpha=0.25)
+            ax2.axvline(WAHRE_QUOTE, color="#c0392b", linestyle="dashed", linewidth=2)
+            ax2.legend(loc="upper left", fontsize=9)
+        else:
+            ax2.text(0.5, 0.5, "Noch keine Fahrten beobachtet.\nKlicke auf einen der Beobachten-Buttons.",
+                     ha="center", va="center", transform=ax2.transAxes, fontsize=11, color="#7f8c8d")
+
+        ax2.set_xlabel("Mögliche Pünktlichkeitsquote von SmartRail")
+        ax2.set_ylabel("Dichte")
+        ax2.set_title("Likelihood der beobachteten Daten")
+        ax2.spines['top'].set_visible(False)
+        ax2.spines['right'].set_visible(False)
+
+        plt.tight_layout()
+        return fig
+
+app = App(app_ui, server)
+```
+
+### Zum Mitnehmen
+Die bayesianische Logik macht zwei Dinge sichtbar, die in der klassischen Statistik im Verborgenen bleiben. Erstens: Vorwissen darf, soll und muss in die Analyse einfließen, sofern es sich begründen lässt. Wer mit gut informierten Priors arbeitet, erhält bei gleicher Datenmenge präzisere Schätzungen. Zweitens: Die Posterior-Verteilung sagt direkt aus, in welchem Bereich der gesuchte Parameter mit welcher Wahrscheinlichkeit liegt. Das ist genau die Information, die man als Anwender eigentlich haben möchte.

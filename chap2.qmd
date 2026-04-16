@@ -1,0 +1,150 @@
+---
+title: "2. Präzision unter Budgetdruck"
+format: html
+---
+
+## Zeit: 25 min | Schwierigkeit: Mittel
+
+### Warum wir vor der Studie rechnen müssen
+Stell dir vor, du bekommst Geld bewilligt, um SmartRail auf einer neuen Strecke zu testen. Wie viele Testfahrten brauchst du, damit dein Ergebnis am Ende belastbar ist? Diese Frage entscheidet sich nicht erst während der Auswertung, sondern schon in der Planung. Eine zu kleine Stichprobe liefert ungenaue Schätzungen, die kaum mehr als eine Pilotstudie sind. Eine zu große Stichprobe verbrennt Budget, ohne zusätzlichen Erkenntnisgewinn zu bringen.
+
+Die Planung der Stichprobengröße orientiert sich an zwei Größen: dem Forschungsstand (was wissen wir bereits ungefähr über die Streuung der Werte) und dem tolerierbaren Fehler. Diesen Fehler nennen wir Margin of Error (MOE). Er beschreibt, wie weit unser Stichprobenergebnis bei wiederholtem Durchführen der Studie maximal vom wahren Populationswert abweichen darf. Übliche Konvention ist, dass die mittleren 95 % der möglichen Studienergebnisse in diesem Bereich liegen sollen.
+
+### Die zentrale Formel
+
+Für die Schätzung eines Mittelwertes ergibt sich die notwendige Stichprobengröße aus folgendem Zusammenhang:
+
+$$N = \left(\frac{1.96 \cdot \sigma}{\text{MOE}}\right)^{2}$$
+
+Drei Dinge fallen sofort auf:
+
+1. Der Faktor $1.96$ stammt aus der Standardnormalverteilung und schließt die mittleren 95 % ein.
+2. Die geschätzte Streuung $\sigma$ in der Population geht linear ein. Streuen die Werte stärker, brauchst du mehr Daten.
+3. Die MOE steht im Nenner und wird quadriert. Halbierst du also die MOE (du willst doppelt so präzise sein), vervierfacht sich die nötige Stichprobe.
+
+Genau dieser quadratische Zusammenhang ist der entscheidende Lerneffekt: Präzision kostet überproportional viele Beobachtungen.
+
+### Beispiel SmartRail: Verspätungen messen
+Du sollst die durchschnittliche Verspätung in Minuten auf einer SmartRail-Pilotstrecke schätzen. Aus Vorerhebungen weißt du, dass die Streuung der Verspätungen ungefähr $\sigma = 5$ Minuten beträgt.
+
+Möchtest du auf $\pm 2$ Minuten genau schätzen, brauchst du:
+
+$$N = \left(\frac{1.96 \cdot 5}{2}\right)^{2} \approx 24$$
+
+Möchtest du es genauer wissen ($\pm 0.5$ Minuten), springt die nötige Stichprobe auf:
+
+$$N = \left(\frac{1.96 \cdot 5}{0.5}\right)^{2} \approx 384$$
+
+Eine Vervierfachung der Präzision (von $\pm 2$ auf $\pm 0.5$) erfordert das Sechzehnfache an Stichprobenumfang.
+
+### Der Budget-Planer
+Ein Testtag mit 10 Fahrten kostet 1.000 Euro. Du verfügst über ein Gesamtbudget von 10.000 Euro, kannst also maximal 100 Fahrten beobachten. Deine Aufgabe ist, die MOE so zu wählen, dass die berechnete Stichprobengröße im Budget bleibt.
+
+### Deine Aufgabe
+Die Applikation simuliert die Studienplanung für SmartRail.
+
+1. **Streuung schätzen:** Lege mit dem Schieberegler eine angenommene Streuung der Verspätungen fest (in Minuten). Realistische Werte liegen zwischen 2 und 10.
+2. **Präzision wählen:** Stelle die gewünschte MOE ein. Die App berechnet sofort die nötige Stichprobengröße $N$ und die daraus resultierenden Kosten.
+3. **Budget beobachten:** Überschreitet die nötige Stichprobengröße dein Budget, färbt sich die Anzeige rot. Suche eine MOE, die dein Budget einhält.
+4. **Kurve verstehen:** Im Plot siehst du den vollständigen Zusammenhang zwischen MOE und nötiger Stichprobengröße. Die Kurve fällt nicht linear, sondern quadratisch ab. Probiere aus, wie sich der Verlauf verändert, wenn die angenommene Streuung größer oder kleiner wird.
+
+```{shinylive-python}
+#| standalone: true
+#| viewerHeight: 700
+
+from shiny import App, render, ui, reactive
+import numpy as np
+import matplotlib.pyplot as plt
+
+KOSTEN_PRO_FAHRT = 100
+BUDGET = 10000
+MAX_FAHRTEN = BUDGET // KOSTEN_PRO_FAHRT
+
+app_ui = ui.page_fluid(
+    ui.card(
+        ui.card_header("SmartRail Budget-Planer: Wie präzise kannst du dir leisten?"),
+        ui.layout_columns(
+            ui.div(
+                ui.h5("Annahmen und Wünsche"),
+                ui.input_slider("sigma", "Geschätzte Streuung der Verspätungen (Minuten)", 1.0, 10.0, 5.0, step=0.5),
+                ui.input_slider("moe", "Gewünschte MOE (Minuten)", 0.2, 5.0, 2.0, step=0.1),
+                ui.hr(),
+                ui.h5("Rahmenbedingungen"),
+                ui.p(f"Kosten pro Fahrt: {KOSTEN_PRO_FAHRT} Euro"),
+                ui.p(f"Gesamtbudget: {BUDGET} Euro"),
+                ui.p(f"Maximal mögliche Fahrten: {MAX_FAHRTEN}"),
+                ui.hr(),
+                ui.output_ui("ergebnis_box"),
+            ),
+            ui.output_plot("budget_plot"),
+            col_widths=(4, 8)
+        )
+    )
+)
+
+def server(input, output, session):
+
+    @reactive.Calc
+    def n_benoetigt():
+        sigma = input.sigma()
+        moe = input.moe()
+        return int(np.ceil((1.96 * sigma / moe) ** 2))
+
+    @reactive.Calc
+    def kosten():
+        return n_benoetigt() * KOSTEN_PRO_FAHRT
+
+    @render.ui
+    def ergebnis_box():
+        n = n_benoetigt()
+        k = kosten()
+        ueber_budget = k > BUDGET
+        farbe = "#e74c3c" if ueber_budget else "#27ae60"
+        status = "BUDGET ÜBERSCHRITTEN" if ueber_budget else "im Budget"
+        return ui.div(
+            ui.h5("Ergebnis"),
+            ui.p(ui.strong(f"Notwendige Stichprobe: N = {n}")),
+            ui.p(ui.strong(f"Kosten: {k} Euro")),
+            ui.div(
+                ui.strong(status),
+                style=f"color: white; background-color: {farbe}; padding: 8px; border-radius: 4px; text-align: center; font-size: 1.1em;"
+            ),
+        )
+
+    @render.plot
+    def budget_plot():
+        sigma = input.sigma()
+        moe_aktuell = input.moe()
+        n_aktuell = n_benoetigt()
+
+        moe_range = np.linspace(0.2, 5.0, 200)
+        n_range = (1.96 * sigma / moe_range) ** 2
+
+        fig, ax = plt.subplots(figsize=(9, 6))
+
+        farben = np.where(n_range * KOSTEN_PRO_FAHRT > BUDGET, "#e74c3c", "#27ae60")
+
+        for i in range(len(moe_range) - 1):
+            ax.plot(moe_range[i:i+2], n_range[i:i+2], color=farben[i], linewidth=2.5)
+
+        ax.axhline(MAX_FAHRTEN, color="#2c3e50", linestyle="dashed", label=f"Budget-Grenze ({MAX_FAHRTEN} Fahrten)")
+        ax.axvline(moe_aktuell, color="#3498db", linestyle="dotted", alpha=0.7)
+        ax.scatter([moe_aktuell], [n_aktuell], color="#3498db", s=120, zorder=5, label="Deine Wahl")
+
+        ax.set_xlabel("Margin of Error (Minuten)")
+        ax.set_ylabel("Notwendige Stichprobengröße N")
+        ax.set_title(f"Quadratischer Zusammenhang: Präzision kostet Stichprobe\n(angenommene Streuung: {sigma} Minuten)")
+        ax.set_ylim(0, min(max(n_range) * 1.1, 1500))
+        ax.legend(loc="upper right")
+        ax.grid(alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        plt.tight_layout()
+        return fig
+
+app = App(app_ui, server)
+```
+
+### Zum Mitnehmen
+Die quadratische Beziehung zwischen MOE und Stichprobenumfang ist eine der wichtigsten Lehren der Stichprobenplanung. Wer ohne MOE-Überlegung in eine Studie startet, riskiert entweder unzureichend präzise Schätzungen oder verschwendet Budget. Die Reihenfolge ist daher immer: tolerierbaren Fehler festlegen, Streuung abschätzen, Stichprobengröße berechnen, dann Daten sammeln.

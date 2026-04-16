@@ -1,0 +1,187 @@
+---
+title: "3. Die Macht der Daten-Aggregation"
+format: html
+---
+
+## Zeit: 25 min | Schwierigkeit: Mittel
+
+### Eine Studie ist ein Zufallsbefund
+Egal wie sorgfältig eine einzelne Studie geplant ist, ihr Ergebnis ist immer ein Stichprobenergebnis und damit von Zufall behaftet. Eine kleine Stichprobe kann zufällig einen extrem hohen oder extrem niedrigen Effekt liefern, ohne dass dieser Effekt in der Grundgesamtheit tatsächlich existiert. Das ist kein methodischer Fehler, sondern eine direkte Folge des Stichprobenfehlers.
+
+Daraus folgt: Viele Studien sagen mehr als eine. Wenn mehrere Forschungsteams unabhängig voneinander dieselbe Frage untersuchen, lassen sich ihre Ergebnisse zusammenführen. Diese Zusammenführung nennen wir Metaanalyse. Sie liefert eine deutlich präzisere Schätzung des wahren Populationseffekts als jede Einzelstudie.
+
+### Das Prinzip: Gewichteter Mittelwert
+Eine naive Metaanalyse würde einfach den arithmetischen Mittelwert aller Studienergebnisse bilden. Das wäre aber unfair: Eine Studie mit $N = 5$ würde gleich stark zählen wie eine Studie mit $N = 500$, obwohl die größere Studie eine viel verlässlichere Schätzung liefert.
+
+Stattdessen erhalten Studien mit größerer Stichprobe (oder genauer: kleinerem Standardfehler) mehr Gewicht. Die typische Gewichtungsformel lautet:
+
+$$\bar{r} = \frac{\sum_{i} w_i \cdot r_i}{\sum_{i} w_i}$$
+
+wobei $r_i$ das Ergebnis der $i$-ten Studie ist und $w_i$ ihr Gewicht. Als Gewicht verwendet man entweder direkt die Stichprobengröße $N_i$ oder den Kehrwert der Varianz des Standardfehlers ($w_i = 1/SE_i^2$). Beide Strategien haben den gleichen Effekt: Große, präzise Studien dominieren das Ergebnis.
+
+Das Resultat dieser Berechnung wird als Pooled Effect oder gewichteter Gesamteffekt bezeichnet.
+
+### Visualisierung: Der Forest Plot
+Ergebnisse von Metaanalysen werden traditionell als Forest Plot dargestellt. Jede Studie ist eine Zeile mit:
+
+- einem Quadrat (oder Kästchen), das den geschätzten Effekt der Studie zeigt;
+- einer horizontalen Linie, die das Konfidenzintervall der Studie darstellt;
+- einer Kästchengröße, die proportional zum Studiengewicht ist (also ungefähr zur Stichprobengröße).
+
+Ganz unten erscheint der Pooled Effect als Diamant. Die horizontale Breite des Diamanten zeigt das Konfidenzintervall des aggregierten Effekts. Da der Pooled Effect aus vielen Beobachtungen stammt, ist er meist deutlich präziser als jede Einzelstudie.
+
+### Beispiel SmartRail: Fünf Teststrecken
+Die Deutsche Bahn hat SmartRail auf fünf verschiedenen Pilotstrecken getestet. Untersucht wurde jeweils die Korrelation zwischen Einsatz von SmartRail und Punktualität. Die Ergebnisse fallen sehr unterschiedlich aus, vor allem weil die Stichprobengrößen massiv variieren.
+
+| Strecke | $N$ | Korrelation $r$ |
+|---------|-----|-----------------|
+| Allgäu-Test | 5 | 0.85 |
+| Rheintal | 30 | 0.42 |
+| Hessen-Mitte | 80 | 0.38 |
+| Norddeutschland | 200 | 0.31 |
+| Bayerisches Hauptnetz | 500 | 0.28 |
+
+Die Allgäu-Studie zeigt einen extrem hohen Effekt, basiert aber nur auf 5 Fahrten. Die Bayern-Studie zeigt einen moderateren Effekt, beruht aber auf 500 Fahrten. Welcher dieser Werte verdient mehr Vertrauen, und wie sieht das Gesamtbild aus, wenn wir alle fünf Studien zusammenführen?
+
+### Deine Aufgabe
+Die Applikation visualisiert die Metaanalyse interaktiv. Du entscheidest selbst, welche Strecken einbezogen werden.
+
+1. **Studien auswählen:** Aktiviere oder deaktiviere die einzelnen SmartRail-Studien per Checkbox. Der Forest Plot rechts aktualisiert sich live.
+2. **Diamant beobachten:** Achte besonders auf die Bewegung des Diamanten am unteren Rand. Schalte zuerst nur die Allgäu-Studie ein (sehr hoher Effekt, aber $N = 5$), dann nur die Bayern-Studie (moderater Effekt, $N = 500$). Wo liegt der Diamant jeweils?
+3. **Aggregation testen:** Schalte alle Studien an. Der Diamant orientiert sich überwiegend an den großen Studien. Die Allgäu-Studie hat zwar ein extremes Ergebnis, durch ihr geringes Gewicht zieht sie den Diamanten aber kaum mit.
+4. **Verstehen:** Vergleiche die Kästchengröße der Studien. Sie spiegelt das Gewicht wider. So wird das Gesetz der großen Zahlen sichtbar: Größere Stichproben dominieren das Gesamtbild.
+
+```{shinylive-python}
+#| standalone: true
+#| viewerHeight: 700
+
+from shiny import App, render, ui, reactive
+import numpy as np
+import matplotlib.pyplot as plt
+
+STUDIEN = [
+    {"name": "Allgäu-Test",          "n": 5,   "r": 0.85},
+    {"name": "Rheintal",             "n": 30,  "r": 0.42},
+    {"name": "Hessen-Mitte",         "n": 80,  "r": 0.38},
+    {"name": "Norddeutschland",      "n": 200, "r": 0.31},
+    {"name": "Bayerisches Hauptnetz","n": 500, "r": 0.28},
+]
+
+def se_korrelation(r, n):
+    if n <= 3:
+        return 1.0
+    return np.sqrt((1 - r ** 2) ** 2 / (n - 1))
+
+app_ui = ui.page_fluid(
+    ui.card(
+        ui.card_header("Gewichtungs-Puzzle: SmartRail-Metaanalyse"),
+        ui.layout_columns(
+            ui.div(
+                ui.h5("Studien einbeziehen"),
+                ui.input_checkbox_group(
+                    "studien",
+                    "Aktive Strecken",
+                    {s["name"]: f"{s['name']}  (N={s['n']}, r={s['r']:.2f})" for s in STUDIEN},
+                    selected=[s["name"] for s in STUDIEN],
+                ),
+                ui.hr(),
+                ui.h5("Pooled Effect"),
+                ui.output_ui("pooled_box"),
+            ),
+            ui.output_plot("forest_plot"),
+            col_widths=(4, 8)
+        )
+    )
+)
+
+def server(input, output, session):
+
+    @reactive.Calc
+    def aktive():
+        ausgewaehlt = input.studien()
+        return [s for s in STUDIEN if s["name"] in ausgewaehlt]
+
+    @reactive.Calc
+    def pooled():
+        a = aktive()
+        if not a:
+            return None
+        rs = np.array([s["r"] for s in a])
+        ns = np.array([s["n"] for s in a])
+        ses = np.array([se_korrelation(s["r"], s["n"]) for s in a])
+        gewichte = 1 / (ses ** 2)
+        pooled_r = np.sum(gewichte * rs) / np.sum(gewichte)
+        pooled_se = np.sqrt(1 / np.sum(gewichte))
+        return pooled_r, pooled_se, gewichte / np.sum(gewichte)
+
+    @render.ui
+    def pooled_box():
+        p = pooled()
+        if p is None:
+            return ui.p("Wähle mindestens eine Studie aus.")
+        pooled_r, pooled_se, _ = p
+        ki_unten = pooled_r - 1.96 * pooled_se
+        ki_oben = pooled_r + 1.96 * pooled_se
+        return ui.div(
+            ui.p(ui.strong(f"Gewichteter Effekt: r = {pooled_r:.3f}")),
+            ui.p(f"95%-KI: [{ki_unten:.3f}; {ki_oben:.3f}]"),
+            ui.p(f"Standardfehler: {pooled_se:.3f}"),
+        )
+
+    @render.plot
+    def forest_plot():
+        a = aktive()
+        fig, ax = plt.subplots(figsize=(9, 6))
+
+        if not a:
+            ax.text(0.5, 0.5, "Keine Studie ausgewählt",
+                    ha="center", va="center", transform=ax.transAxes, fontsize=14)
+            ax.set_axis_off()
+            return fig
+
+        p = pooled()
+        pooled_r, pooled_se, gewichte_norm = p
+
+        y_positions = list(range(len(a), 0, -1))
+        farbe_studien = "#34495e"
+
+        for i, studie in enumerate(a):
+            y = y_positions[i]
+            r = studie["r"]
+            se = se_korrelation(r, studie["n"])
+            ki_u = r - 1.96 * se
+            ki_o = r + 1.96 * se
+            kasten_groesse = 50 + 800 * gewichte_norm[i]
+
+            ax.plot([ki_u, ki_o], [y, y], color=farbe_studien, linewidth=1.5)
+            ax.scatter([r], [y], s=kasten_groesse, color=farbe_studien, marker="s", zorder=5)
+            ax.text(-0.15, y, f"{studie['name']}", ha="right", va="center", fontsize=10)
+            ax.text(1.05, y, f"N={studie['n']}", ha="left", va="center", fontsize=9, color="#7f8c8d")
+
+        diamant_y = 0
+        ki_u = pooled_r - 1.96 * pooled_se
+        ki_o = pooled_r + 1.96 * pooled_se
+        diamant_x = [ki_u, pooled_r, ki_o, pooled_r, ki_u]
+        diamant_y_pts = [diamant_y, diamant_y + 0.3, diamant_y, diamant_y - 0.3, diamant_y]
+        ax.fill(diamant_x, diamant_y_pts, color="#c0392b", alpha=0.85)
+        ax.text(-0.15, diamant_y, "Pooled Effect", ha="right", va="center",
+                fontsize=11, fontweight="bold")
+
+        ax.axvline(0, color="#bdc3c7", linestyle="dashed", linewidth=1)
+        ax.set_xlim(-0.2, 1.2)
+        ax.set_ylim(-1, len(a) + 1)
+        ax.set_xlabel("Korrelation SmartRail – Punktualität (r)")
+        ax.set_yticks([])
+        ax.set_title("Forest Plot: Größere Studien (größere Kästen) ziehen den Diamanten")
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+
+        plt.tight_layout()
+        return fig
+
+app = App(app_ui, server)
+```
+
+### Zum Mitnehmen
+Das Gewichtungsprinzip ist die zentrale Stärke der Metaanalyse. Spektakuläre Einzelergebnisse aus kleinen Stichproben verlieren ihre Dominanz, sobald belastbarere Studien ins Modell aufgenommen werden. Wer einer einzelnen Studie blind vertraut, läuft Gefahr, einem Zufallsbefund aufzusitzen. Wer in Replikationen denkt und Ergebnisse aggregiert, nähert sich dem wahren Populationseffekt deutlich verlässlicher.

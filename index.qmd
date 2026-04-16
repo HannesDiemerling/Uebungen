@@ -1,0 +1,29 @@
+---
+title: "Bayesian Intuition: Ein interaktiver Workshop zur Inferenzstatistik"
+format: html
+---
+
+## Worum es geht
+
+Dieser Workshop führt dich Schritt für Schritt durch zentrale Konzepte der Inferenzstatistik. Statt Formeln auswendig zu lernen oder per Hand auszurechnen, explorierst du jedes Konzept in einer interaktiven Applikation. Du beobachtest, wie sich Stichprobengrößen, Effektgrößen, Prior-Verteilungen und andere Größen auf das Ergebnis auswirken, und entwickelst so eine Intuition für die zugrundeliegende Statistik.
+
+## Das durchgängige Szenario: SmartRail
+
+Alle Kapitel verwenden dasselbe fiktive Beispiel: SmartRail ist ein KI-System der Deutschen Bahn, das Signale und Weichen in Echtzeit steuert und so die Pünktlichkeit verbessern soll. Auf Pilotstrecken werden derzeit Testfahrten durchgeführt. Du übernimmst die Rolle einer Analystin oder eines Analysten und nutzt die statistischen Werkzeuge, um die Wirksamkeit von SmartRail einzuschätzen.
+
+## Aufbau
+
+Jedes Kapitel ist eigenständig bearbeitbar. Du brauchst keine Vorkenntnisse und keine Begleitliteratur. Jede Einheit enthält eine kurze theoretische Einführung, ein konkretes SmartRail-Beispiel und eine interaktive App, in der du das Konzept selbst erkundest.
+
+| Kapitel | Thema | Schwierigkeit |
+|---------|-------|---------------|
+| 1 | Wahrscheinlichkeitsbegriffe | Einfach |
+| 2 | Stichprobenplanung unter Budgetdruck | Mittel |
+| 3 | Metaanalyse und Datenaggregation | Mittel |
+| 4 | Publication Bias und Funnel Plots | Mittel |
+| 5 | Bayesianische Wissens-Revision | Fortgeschritten |
+| 6 | Credible Intervals und Vorwissen | Fortgeschritten |
+
+## Empfehlung
+
+Bearbeite die Kapitel idealerweise in der angegebenen Reihenfolge. Wenn dich ein einzelnes Thema besonders interessiert, kannst du aber auch direkt einsteigen, da jedes Kapitel die nötigen Grundlagen kurz wiederholt.

@@ -1,0 +1,163 @@
+---
+title: "4. Der verzerrte Jahresbericht"
+format: html
+---
+
+## Zeit: 25 min | Schwierigkeit: Mittel
+
+### Was sichtbar wird, ist nicht alles, was passiert ist
+Stell dir vor, die Deutsche Bahn führt 50 SmartRail-Simulationen durch. In manchen zeigt SmartRail einen großen Effekt auf die Punktualität, in manchen einen kleinen, in manchen sogar einen leicht negativen. Die Marketingabteilung soll daraus einen Jahresbericht erstellen. Welche Simulationen schaffen es in den Bericht? Höchstwahrscheinlich nur die, die einen klar positiven Effekt zeigen. Die anderen verschwinden in der Schublade.
+
+Genau dieses Problem heißt in der Wissenschaft Publication Bias. Studien mit signifikanten, klaren Effekten werden eher publiziert als Studien mit kleinen oder uneindeutigen Effekten. Konsequenz: Wer später eine Metaanalyse über die publizierte Literatur macht, sieht systematisch zu viele große Effekte und überschätzt den wahren Populationseffekt.
+
+### Warum gerade die kleinen Studien fehlen
+Signifikanztests reagieren empfindlich auf die Stichprobengröße. Eine kleine Stichprobe braucht einen großen beobachteten Effekt, um signifikant zu werden. Eine kleine Stichprobe mit kleinem beobachtetem Effekt ist hingegen praktisch immer nicht-signifikant. Diese Studien wandern besonders häufig in die berühmte Schublade.
+
+Daraus folgt ein klares Muster: Wenn ein Publication Bias vorliegt, fehlen vor allem kleine Studien mit kleinen Effekten. Genau das macht der Funnel Plot sichtbar.
+
+### Der Funnel Plot
+Im Funnel Plot wird auf der X-Achse der gefundene Effekt jeder Studie und auf der Y-Achse ein Maß für die Präzision aufgetragen, typischerweise der Standardfehler (von oben nach unten zunehmend). Ohne Bias entsteht ein symmetrisches Bild, das wie ein umgedrehter Trichter aussieht:
+
+- Oben (kleine Standardfehler, große Stichproben) liegen die Studien eng beieinander um den wahren Effekt.
+- Unten (große Standardfehler, kleine Stichproben) streuen die Studien weit, aber symmetrisch um denselben wahren Effekt.
+
+Mit Publication Bias fehlen Studien systematisch in einer Ecke, meist links unten (kleine Stichprobe und kleiner oder negativer Effekt). Der Trichter wird asymmetrisch.
+
+### Beispiel SmartRail: 50 Simulationen
+SmartRail wurde in 50 unabhängigen Simulationen untersucht. Der wahre Effekt liegt bei etwa $d = 0.30$ (kleiner bis mittlerer Effekt). Aufgrund unterschiedlich großer Stichproben streuen die einzelnen Ergebnisse mehr oder weniger stark um diesen wahren Wert.
+
+Im Jahresbericht für die Pressekonferenz möchte die Marketingabteilung aber nur Studien zeigen, deren Effekt überzeugend wirkt. Konkret: Ein Marketing-Filter blendet alle Simulationen aus, deren $z$-Wert kleiner als 1.96 ist (also nicht signifikant auf dem 5 %-Niveau). Was übrig bleibt, ist eine optisch beeindruckende Auswahl, die den wahren Effekt jedoch deutlich überschätzt.
+
+### Deine Aufgabe
+Die Applikation simuliert 50 SmartRail-Studien und zeigt sie als Funnel Plot.
+
+1. **Vollbild ansehen:** Beim Start siehst du alle 50 Simulationen. Sie verteilen sich symmetrisch um den wahren Effekt (gestrichelte Linie). Der gemittelte Effekt aller Studien (durchgezogene Linie) liegt sehr nahe am wahren Wert.
+2. **Marketing-Filter aktivieren:** Schalte den Filter ein. Alle nicht-signifikanten Simulationen verschwinden. Achte besonders auf den linken unteren Bereich des Plots: Hier reißt eine Lücke auf. Der gemittelte Effekt wandert nach rechts und überschätzt den wahren Effekt deutlich.
+3. **Detektivarbeit:** Stelle deinen eigenen Schätzwert für den wahren Effekt mit dem Schieberegler ein. Versuche, allein anhand der nach Filterung sichtbaren Studien zu erraten, wo der wahre Effekt liegen könnte. Die App vergleicht deine Schätzung mit dem tatsächlichen Wert.
+4. **Streuung variieren:** Verändere den Stichproben-Skalierungsfaktor. Du siehst, wie sich die Trichterform verändert und wie deutlich der Bias je nach Studienlage erkennbar wird.
+
+```{shinylive-python}
+#| standalone: true
+#| viewerHeight: 750
+
+from shiny import App, render, ui, reactive
+import numpy as np
+import matplotlib.pyplot as plt
+
+WAHRER_EFFEKT = 0.30
+N_STUDIEN = 50
+
+app_ui = ui.page_fluid(
+    ui.card(
+        ui.card_header("Detektiv im Trichter: Publication Bias bei SmartRail"),
+        ui.layout_columns(
+            ui.div(
+                ui.h5("Steuerung"),
+                ui.input_action_button("regenerate", "Neue 50 Simulationen erzeugen", class_="btn-primary"),
+                ui.hr(),
+                ui.input_checkbox("filter", "Marketing-Filter aktivieren (nur signifikante Studien zeigen)", value=False),
+                ui.input_slider("n_skala", "Stichprobenskala (kleiner = mehr Streuung)", 20, 200, 60, step=10),
+                ui.input_slider("schaetzung", "Deine Schätzung des wahren Effekts", -0.2, 0.8, 0.3, step=0.01),
+                ui.hr(),
+                ui.h5("Bilanz"),
+                ui.output_ui("statistik_box"),
+            ),
+            ui.output_plot("funnel_plot"),
+            col_widths=(4, 8)
+        )
+    )
+)
+
+def server(input, output, session):
+
+    @reactive.Calc
+    def studien():
+        seed = input.regenerate() if input.regenerate() > 0 else 42
+        rng = np.random.default_rng(seed)
+        n_basis = input.n_skala()
+        ns = rng.integers(low=max(10, n_basis // 4), high=n_basis * 4, size=N_STUDIEN)
+        ses = 1 / np.sqrt(ns)
+        effekte = rng.normal(WAHRER_EFFEKT, ses, size=N_STUDIEN)
+        z_werte = effekte / ses
+        return effekte, ses, ns, z_werte
+
+    @reactive.Calc
+    def sichtbar_mask():
+        _, _, _, z = studien()
+        if input.filter():
+            return z >= 1.96
+        return np.ones_like(z, dtype=bool)
+
+    @render.ui
+    def statistik_box():
+        effekte, ses, _, _ = studien()
+        mask = sichtbar_mask()
+        anzahl = int(np.sum(mask))
+        if anzahl == 0:
+            mittel = float("nan")
+        else:
+            gewichte = 1 / ses[mask] ** 2
+            mittel = np.sum(gewichte * effekte[mask]) / np.sum(gewichte)
+        schaetzung = input.schaetzung()
+        abweichung_du = schaetzung - WAHRER_EFFEKT
+        abweichung_filter = mittel - WAHRER_EFFEKT if anzahl > 0 else 0
+        return ui.div(
+            ui.p(f"Sichtbare Studien: {anzahl} von {N_STUDIEN}"),
+            ui.p(ui.strong(f"Wahrer Effekt: {WAHRER_EFFEKT:.2f}")),
+            ui.p(f"Gewichteter Effekt der sichtbaren Studien: {mittel:.3f}"),
+            ui.p(f"Bias durch Filter: {abweichung_filter:+.3f}"),
+            ui.hr(),
+            ui.p(ui.strong(f"Deine Schätzung: {schaetzung:.2f}")),
+            ui.p(f"Deine Abweichung vom wahren Wert: {abweichung_du:+.3f}"),
+        )
+
+    @render.plot
+    def funnel_plot():
+        effekte, ses, _, _ = studien()
+        mask = sichtbar_mask()
+        schaetzung = input.schaetzung()
+
+        fig, ax = plt.subplots(figsize=(9, 7))
+
+        if input.filter():
+            ax.scatter(effekte[~mask], ses[~mask], s=40, color="#bdc3c7", alpha=0.4, label="Ausgefiltert")
+        ax.scatter(effekte[mask], ses[mask], s=60, color="#2980b9", alpha=0.85, label="Sichtbar")
+
+        se_max = ses.max() * 1.1
+        se_grid = np.linspace(0.001, se_max, 200)
+        trichter_links = WAHRER_EFFEKT - 1.96 * se_grid
+        trichter_rechts = WAHRER_EFFEKT + 1.96 * se_grid
+        ax.plot(trichter_links, se_grid, color="#7f8c8d", linestyle="dashed", alpha=0.6, label="95% Trichter (wahrer Effekt)")
+        ax.plot(trichter_rechts, se_grid, color="#7f8c8d", linestyle="dashed", alpha=0.6)
+
+        ax.axvline(WAHRER_EFFEKT, color="#27ae60", linestyle="dashed", linewidth=2, label=f"Wahrer Effekt ({WAHRER_EFFEKT:.2f})")
+
+        if np.sum(mask) > 0:
+            gewichte = 1 / ses[mask] ** 2
+            mittel = np.sum(gewichte * effekte[mask]) / np.sum(gewichte)
+            ax.axvline(mittel, color="#c0392b", linewidth=2, label=f"Effekt nach Filter ({mittel:.2f})")
+
+        ax.axvline(schaetzung, color="#8e44ad", linestyle="dotted", linewidth=2, label=f"Deine Schätzung ({schaetzung:.2f})")
+
+        if input.filter():
+            grenze_x = 1.96 * se_grid
+            ax.fill_betweenx(se_grid, -1, grenze_x, color="#e74c3c", alpha=0.07, label="Bereich ohne Sichtbarkeit")
+
+        ax.invert_yaxis()
+        ax.set_xlabel("Beobachteter Effekt (Cohen's d)")
+        ax.set_ylabel("Standardfehler (kleiner = präziser)")
+        ax.set_xlim(-0.4, 1.0)
+        ax.set_title("Funnel Plot: Symmetrischer Trichter ohne Bias, asymmetrisch mit Filter")
+        ax.legend(loc="lower right", fontsize=8)
+        ax.grid(alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        plt.tight_layout()
+        return fig
+
+app = App(app_ui, server)
+```
+
+### Zum Mitnehmen
+Asymmetrische Funnel Plots sind ein Warnsignal. Sie sind kein Beweis für einen Publication Bias, deuten aber stark darauf hin. Eine Metaanalyse, die nur publizierte Studien einbezieht, kann den wahren Effekt systematisch überschätzen. Korrekturverfahren wie Trim-and-Fill oder p-curve gibt es zwar, sie funktionieren aber nur unter strengen Annahmen. Die wichtigste Konsequenz für die Praxis ist daher Transparenz: Studienprotokolle vorab registrieren, auch nicht-signifikante Ergebnisse publizieren und in Reviews konsequent nach grauer Literatur suchen.

@@ -1,0 +1,214 @@
+---
+title: "6. Wahre Sicherheit"
+format: html
+---
+
+## Zeit: 25 min | Schwierigkeit: Fortgeschritten
+
+### Das Missverständnis des Konfidenzintervalls
+Ein 95-%-Konfidenzintervall (KI) ist die wohl missverstandenste Größe der Statistik. Die weit verbreitete Fehlinterpretation lautet: „Der wahre Parameter liegt mit 95 % Wahrscheinlichkeit in diesem Intervall." Das ist klassisch-frequentistisch nicht korrekt. Die richtige Interpretation ist: Würde man das Experiment unendlich oft wiederholen und jedes Mal ein KI nach derselben Vorschrift berechnen, so würden 95 % dieser Intervalle den wahren, aber unbekannten Parameter enthalten. Die Wahrscheinlichkeit bezieht sich auf die Methode, nicht auf das konkrete Intervall.
+
+Das ist ein subtiler, aber bedeutender Unterschied. Für die praktische Entscheidungsfindung möchte man in der Regel wissen, wo der Parameter mit hoher Wahrscheinlichkeit liegt, und nicht, wie gut ein Verfahren auf lange Sicht funktioniert.
+
+### Das Credible Interval
+Die bayesianische Antwort heißt Credible Interval, auf Deutsch Glaubwürdigkeitsintervall. Es wird direkt aus der Posterior-Verteilung abgeleitet und sagt genau das aus, was Anwender ohnehin vermuten: Der Parameter liegt mit 95 % Wahrscheinlichkeit in diesem Bereich, gegeben die Daten und den Prior.
+
+Die Berechnung ist einfach: Man schneidet aus der Posterior-Verteilung die mittleren 95 % der Wahrscheinlichkeitsmasse heraus. Bei einer Beta-Posterior etwa verwendet man die 2.5-%- und 97.5-%-Quantile.
+
+### Vorwissen verkleinert das Intervall
+Zwei Forschende analysieren dieselben SmartRail-Daten. Die erste Person hat keine Vorinformation und startet mit einem uniformen Prior $\text{Beta}(1, 1)$. Die zweite hat über Jahre mit ähnlichen Systemen gearbeitet und startet mit einem informierten Prior, der um die in der Vergangenheit beobachteten Quoten konzentriert ist.
+
+Beide sehen dieselben Daten, kommen aber zu unterschiedlich breiten Credible Intervals. Das informierte Intervall ist schmaler, weil die Posterior-Verteilung Daten und Vorwissen kombiniert. Vorwissen erhöht die Präzision der Schätzung, ohne dass mehr Daten gesammelt werden müssen.
+
+### Beispiel SmartRail: Die 95-%-Wette
+Die wahre Pünktlichkeitsquote von SmartRail liegt in unserer Simulation bei 85 %. Du beobachtest eine begrenzte Zahl von Fahrten und sollst schätzen, in welchem Bereich die wahre Quote liegt.
+
+Zum Vergleich rechnen wir zwei Intervalle parallel:
+
+- Ein frequentistisches Konfidenzintervall (Wald-Form) auf Basis der beobachteten Anteile.
+- Ein bayesianisches Credible Interval, entweder mit einem ahnungslosen oder mit einem informierten Prior.
+
+Der informierte Prior stammt aus früheren Messungen vergleichbarer Systeme. Wir formalisieren ihn als $\text{Beta}(34, 6)$, das entspricht einer Vorerwartung von etwa 85 % Pünktlichkeit mit mäßiger Überzeugung. Der ahnungslose Prior ist $\text{Beta}(1, 1)$ (uniform).
+
+### Deine Aufgabe
+Die Applikation simuliert das Schätzen der SmartRail-Quote und vergleicht beide Ansätze.
+
+1. **Daten beobachten:** Stelle mit dem Schieberegler die Anzahl beobachteter Fahrten ein. Die App simuliert daraufhin die Ergebnisse und berechnet Konfidenz- und Credible Interval.
+2. **Prior wählen:** Schalte zwischen ahnungslosem und informiertem Prior um. Sieh, wie das Credible Interval schmaler wird, sobald Vorwissen einfließt.
+3. **Wette abschließen:** Unterhalb der Plots erscheinen drei Kennzahlen: Breite des KI, Breite des CI ohne Vorwissen und Breite des CI mit Vorwissen. Welcher Ansatz liefert bei wenigen Daten das schmalste Intervall, das den wahren Wert trotzdem überdeckt?
+4. **Kleine Stichproben ausprobieren:** Gehe auf sehr wenige Fahrten (etwa 5 oder 10) zurück. Das Konfidenzintervall wird instabil und kann sehr breit oder unrealistisch werden. Das informierte Credible Interval bleibt stabil, weil der Prior ihm Halt gibt.
+
+```{shinylive-python}
+#| standalone: true
+#| viewerHeight: 780
+
+from shiny import App, render, ui, reactive
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import beta, norm
+
+WAHRE_QUOTE = 0.85
+PRIOR_INFORMIERT = (34, 6)
+PRIOR_AHNUNGSLOS = (1, 1)
+
+app_ui = ui.page_fluid(
+    ui.card(
+        ui.card_header("Die 95%-Wette: Konfidenz- gegen Credible Interval"),
+        ui.layout_columns(
+            ui.div(
+                ui.h5("Daten"),
+                ui.input_slider("n_fahrten", "Anzahl beobachteter Fahrten", 5, 300, 20, step=1),
+                ui.input_action_button("neu_simulieren", "Neue Stichprobe ziehen", class_="btn-primary"),
+                ui.hr(),
+                ui.h5("Vorwissen der Analystin"),
+                ui.input_radio_buttons(
+                    "prior_typ",
+                    "Welcher Prior?",
+                    choices={
+                        "ahnungslos": "Ahnungslos (uniform)",
+                        "informiert": "Informiert (Experten-Vorwissen)",
+                    },
+                    selected="ahnungslos",
+                ),
+                ui.hr(),
+                ui.output_ui("vergleich_box"),
+            ),
+            ui.output_plot("intervall_plot"),
+            col_widths=(4, 8)
+        )
+    )
+)
+
+def server(input, output, session):
+
+    @reactive.Calc
+    def stichprobe():
+        seed = input.neu_simulieren() + 100
+        n = input.n_fahrten()
+        rng = np.random.default_rng(seed)
+        k = int(rng.binomial(n, WAHRE_QUOTE))
+        return n, k
+
+    @reactive.Calc
+    def konfidenzintervall():
+        n, k = stichprobe()
+        p_hat = k / n if n > 0 else 0.5
+        se = np.sqrt(p_hat * (1 - p_hat) / n) if n > 0 else 0
+        z = norm.ppf(0.975)
+        unten = max(0.0, p_hat - z * se)
+        oben = min(1.0, p_hat + z * se)
+        return p_hat, unten, oben
+
+    @reactive.Calc
+    def credible_interval():
+        n, k = stichprobe()
+        if input.prior_typ() == "informiert":
+            a0, b0 = PRIOR_INFORMIERT
+        else:
+            a0, b0 = PRIOR_AHNUNGSLOS
+        a_post = a0 + k
+        b_post = b0 + n - k
+        unten = beta.ppf(0.025, a_post, b_post)
+        oben = beta.ppf(0.975, a_post, b_post)
+        mittel = a_post / (a_post + b_post)
+        return mittel, unten, oben, a_post, b_post
+
+    @reactive.Calc
+    def credible_alternativ():
+        n, k = stichprobe()
+        if input.prior_typ() == "informiert":
+            a0, b0 = PRIOR_AHNUNGSLOS
+        else:
+            a0, b0 = PRIOR_INFORMIERT
+        a_post = a0 + k
+        b_post = b0 + n - k
+        unten = beta.ppf(0.025, a_post, b_post)
+        oben = beta.ppf(0.975, a_post, b_post)
+        return unten, oben
+
+    @render.ui
+    def vergleich_box():
+        n, k = stichprobe()
+        p_hat, ki_u, ki_o = konfidenzintervall()
+        post_mittel, ci_u, ci_o, _, _ = credible_interval()
+        ci2_u, ci2_o = credible_alternativ()
+        breite_ki = ki_o - ki_u
+        breite_ci = ci_o - ci_u
+        breite_ci2 = ci2_o - ci2_u
+        label_aktiv = "informiert" if input.prior_typ() == "informiert" else "ahnungslos"
+        label_alternativ = "ahnungslos" if input.prior_typ() == "informiert" else "informiert"
+        return ui.div(
+            ui.h5("Beobachtung"),
+            ui.p(f"Fahrten: {n}, davon pünktlich: {k}"),
+            ui.p(f"Empirische Quote: {p_hat:.3f}"),
+            ui.hr(),
+            ui.p(ui.strong(f"KI (frequentistisch): [{ki_u:.3f}; {ki_o:.3f}]")),
+            ui.p(f"Breite: {breite_ki:.3f}"),
+            ui.p(ui.strong(f"CI ({label_aktiv}): [{ci_u:.3f}; {ci_o:.3f}]")),
+            ui.p(f"Breite: {breite_ci:.3f}"),
+            ui.p(f"CI ({label_alternativ}) Breite: {breite_ci2:.3f}"),
+            ui.hr(),
+            ui.p(f"Wahre Quote: {WAHRE_QUOTE:.2f}"),
+        )
+
+    @render.plot
+    def intervall_plot():
+        n, k = stichprobe()
+        p_hat, ki_u, ki_o = konfidenzintervall()
+        post_mittel, ci_u, ci_o, a_post, b_post = credible_interval()
+
+        if input.prior_typ() == "informiert":
+            a0, b0 = PRIOR_INFORMIERT
+            prior_label = f"Informiert  Beta({a0}, {b0})"
+        else:
+            a0, b0 = PRIOR_AHNUNGSLOS
+            prior_label = f"Ahnungslos  Beta({a0}, {b0})"
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={"height_ratios": [1, 1.4]})
+
+        x = np.linspace(0.001, 0.999, 400)
+        prior_y = beta.pdf(x, a0, b0)
+        post_y = beta.pdf(x, a_post, b_post)
+
+        ax1.plot(x, prior_y, color="#3498db", linewidth=2.2, label=f"Prior: {prior_label}")
+        ax1.fill_between(x, 0, prior_y, color="#3498db", alpha=0.18)
+        ax1.plot(x, post_y, color="#27ae60", linewidth=2.5, label=f"Posterior  Beta({a_post:.1f}, {b_post:.1f})")
+        ax1.fill_between(x, ci_u, ci_o, where=(x >= ci_u) & (x <= ci_o),
+                         color="#27ae60", alpha=0.35)
+        ax1.axvline(WAHRE_QUOTE, color="#c0392b", linestyle="dashed", linewidth=2, label=f"Wahre Quote ({WAHRE_QUOTE:.2f})")
+        ax1.set_ylabel("Dichte")
+        ax1.set_title("Prior und Posterior (schattierter Bereich = 95%-Credible Interval)")
+        ax1.legend(loc="upper left", fontsize=9)
+        ax1.spines['top'].set_visible(False)
+        ax1.spines['right'].set_visible(False)
+
+        labels = ["Frequentistisches\nKonfidenzintervall", "Bayesianisches\nCredible Interval"]
+        mittel_werte = [p_hat, post_mittel]
+        fehler_unten = [p_hat - ki_u, post_mittel - ci_u]
+        fehler_oben = [ki_o - p_hat, ci_o - post_mittel]
+        farben = ["#2980b9", "#27ae60"]
+
+        for i, (lab, m, fu, fo, farbe) in enumerate(zip(labels, mittel_werte, fehler_unten, fehler_oben, farben)):
+            ax2.errorbar([i], [m], yerr=[[fu], [fo]], fmt="o", color=farbe,
+                         markersize=12, capsize=10, capthick=2.5, elinewidth=2.5)
+
+        ax2.axhline(WAHRE_QUOTE, color="#c0392b", linestyle="dashed", linewidth=2, label=f"Wahre Quote ({WAHRE_QUOTE:.2f})")
+        ax2.set_xticks([0, 1])
+        ax2.set_xticklabels(labels)
+        ax2.set_xlim(-0.5, 1.5)
+        ax2.set_ylim(0, 1)
+        ax2.set_ylabel("Pünktlichkeitsquote")
+        ax2.set_title(f"Vergleich der 95%-Intervalle bei {n} Fahrten ({k} pünktlich)")
+        ax2.legend(loc="lower right", fontsize=9)
+        ax2.spines['top'].set_visible(False)
+        ax2.spines['right'].set_visible(False)
+        ax2.grid(axis="y", alpha=0.3)
+
+        plt.tight_layout()
+        return fig
+
+app = App(app_ui, server)
+```
+
+### Zum Mitnehmen
+Das Credible Interval ist die direkte Antwort auf die Frage, in welchem Bereich der Parameter mit hoher Wahrscheinlichkeit liegt. Es ersetzt das Konfidenzintervall nicht, ist aber in vielen angewandten Kontexten intuitiver und entscheidungsrelevanter. Entscheidend ist: Vorwissen darf nicht beliebig zusammengebastelt werden. Wer einen informierten Prior einsetzt, muss offenlegen, woraus er stammt (frühere Daten, Expertenbefragung, Meta-Ergebnisse) und wie sensibel das Ergebnis auf Änderungen des Priors reagiert. Gute bayesianische Praxis beinhaltet deshalb eine sogenannte Sensitivitätsanalyse: Wie verschiebt sich die Posterior unter plausiblen alternativen Priors?
