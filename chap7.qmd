@@ -1,0 +1,210 @@
+---
+title: "7. Mindeststichproben-Rechner"
+format: html
+---
+
+Tool zur Berechnung der Mindeststichprobengröße für verschiedene Studiendesigns auf Basis der Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, Designparameter und tolerierbare Fehler sind frei wählbar; das Tool gibt das nötige $N$ zurück.
+
+```{shinylive-python}
+#| standalone: true
+#| viewerHeight: 900
+
+from shiny import App, render, ui, reactive
+import numpy as np
+from scipy.stats import norm
+
+DESIGNS = {
+    "mean":         "1. Mittelwert",
+    "prop":         "2. Anteil",
+    "mean_indep":   "3. Mittelwertsunterschied (unabhängige Messungen)",
+    "mean_dep":     "4. Mittelwertsunterschied (abhängige Messungen)",
+    "corr":         "5. Korrelationskoeffizient",
+    "reg_simple":   "6. Regressionskoeffizient (einfache Regression, unstandardisiert)",
+    "reg_mult_b":   "7. Regressionskoeffizient (multiple Regression, unstandardisiert)",
+    "reg_mult_beta":"8. Regressionskoeffizient (multiple Regression, standardisiert)",
+    "reg_mw":       "9. Interaktionseffekt (multiple Regression mit Messwiederholung)",
+}
+
+def z_wert(konfidenz):
+    alpha = 1 - konfidenz / 100.0
+    return norm.ppf(1 - alpha / 2.0)
+
+def n_mean(z, sigma, moe):
+    return (z * sigma / moe) ** 2
+
+def n_prop(z, p, moe):
+    return (z ** 2) * p * (1 - p) / (moe ** 2)
+
+def n_mean_indep(z, sigma, moe):
+    return 2 * (z * sigma / moe) ** 2
+
+def n_mean_dep(z, sigma_diff, moe):
+    return (z * sigma_diff / moe) ** 2
+
+def n_corr(z, r, moe):
+    return 3 + (z * (1 - r ** 2) / moe) ** 2
+
+def n_reg_simple(z, sigma_e, moe, var_x):
+    return 1 + (z ** 2) * (sigma_e ** 2) / ((moe ** 2) * var_x)
+
+def n_reg_mult_b(z, sigma_e, moe, var_x, vif):
+    return 1 + (z ** 2) * (sigma_e ** 2) * vif / ((moe ** 2) * var_x)
+
+def n_reg_mult_beta(z, r2, vif, moe):
+    return 1 + (z ** 2) * (1 - r2) * vif / (moe ** 2)
+
+def n_reg_mw(z, sigma_e, m, icc, moe, var_t, var_g):
+    return ((z ** 2) * (sigma_e ** 2) * (1 + (m - 1) * icc)) / (m * (moe ** 2) * var_t * var_g)
+
+inputs_mean = ui.div(
+    ui.input_numeric("mean_sigma", "Geschätzte Streuung sigma der Population", value=10.0, min=0.0001, step=0.1),
+    ui.input_numeric("mean_moe",   "Tolerierbare MOE",                          value=2.0,  min=0.0001, step=0.1),
+)
+inputs_prop = ui.div(
+    ui.input_numeric("prop_p",   "Geschätzter Anteil p (zwischen 0 und 1)", value=0.15, min=0.0001, max=0.9999, step=0.01),
+    ui.input_numeric("prop_moe", "Tolerierbare MOE (in Anteilseinheiten)",  value=0.05, min=0.0001, step=0.01),
+)
+inputs_mean_indep = ui.div(
+    ui.input_numeric("mi_sigma", "Geschätzte Streuung sigma pro Gruppe", value=2.0, min=0.0001, step=0.1),
+    ui.input_numeric("mi_moe",   "Tolerierbare MOE für die Differenz",    value=0.5, min=0.0001, step=0.1),
+)
+inputs_mean_dep = ui.div(
+    ui.input_numeric("md_sigma_diff", "Geschätzte Streuung der Differenzwerte sigma_diff", value=5.0, min=0.0001, step=0.1),
+    ui.input_numeric("md_moe",        "Tolerierbare MOE für den Differenz-Mittelwert",     value=1.0, min=0.0001, step=0.1),
+)
+inputs_corr = ui.div(
+    ui.input_numeric("corr_r",   "Vermuteter Korrelationskoeffizient r (-1 bis 1)", value=0.3,  min=-0.99, max=0.99, step=0.05),
+    ui.input_numeric("corr_moe", "Tolerierbare MOE für r",                          value=0.1,  min=0.0001, step=0.01),
+)
+inputs_reg_simple = ui.div(
+    ui.input_numeric("rs_sigma_e", "Residual-Streuung sigma_e (oder konservativ SD des Kriteriums)", value=2.0,  min=0.0001, step=0.1),
+    ui.input_numeric("rs_var_x",   "Varianz des Prädiktors Var(x)",                                  value=225.0, min=0.0001, step=1.0),
+    ui.input_numeric("rs_moe",     "Tolerierbare MOE für b",                                          value=0.025, min=0.000001, step=0.005),
+)
+inputs_reg_mult_b = ui.div(
+    ui.input_numeric("rmb_sigma_e", "Residual-Streuung sigma_e", value=2.0,  min=0.0001, step=0.1),
+    ui.input_numeric("rmb_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
+    ui.input_numeric("rmb_vif",     "Variance Inflation Factor (VIF)", value=1.5, min=1.0, step=0.1),
+    ui.input_numeric("rmb_moe",     "Tolerierbare MOE für b", value=0.025, min=0.000001, step=0.005),
+)
+inputs_reg_mult_beta = ui.div(
+    ui.input_numeric("rmbeta_r2",  "Erwartetes R² des Gesamtmodells (0 bis 1)", value=0.9, min=0.0, max=0.999, step=0.05),
+    ui.input_numeric("rmbeta_vif", "Variance Inflation Factor (VIF)", value=2.0, min=1.0, step=0.1),
+    ui.input_numeric("rmbeta_moe", "Tolerierbare MOE für Beta", value=0.04, min=0.000001, step=0.005),
+)
+inputs_reg_mw = ui.div(
+    ui.input_numeric("rmw_sigma_e", "Residual-Streuung sigma_e", value=2.0, min=0.0001, step=0.1),
+    ui.input_numeric("rmw_m",       "Anzahl Messungen pro Person m", value=2, min=2, step=1),
+    ui.input_numeric("rmw_icc",     "Intraklassenkorrelation ICC (0 bis 1)", value=0.5, min=0.0, max=0.999, step=0.05),
+    ui.input_numeric("rmw_var_t",   "Varianz der Zeit-Codierung Var(T)", value=0.25, min=0.0001, step=0.05),
+    ui.input_numeric("rmw_var_g",   "Varianz der Gruppen-Codierung Var(G)", value=0.25, min=0.0001, step=0.05),
+    ui.input_numeric("rmw_moe",     "Tolerierbare MOE für den Interaktionseffekt", value=1.0, min=0.0001, step=0.1),
+)
+
+app_ui = ui.page_fluid(
+    ui.card(
+        ui.card_header("Mindeststichproben-Rechner"),
+        ui.layout_columns(
+            ui.div(
+                ui.input_select("design", "Studiendesign", choices=DESIGNS, selected="mean"),
+                ui.input_numeric("konfidenz", "Konfidenzniveau in % (z. B. 95 oder 99)", value=95.0, min=50.0, max=99.99, step=1.0),
+                ui.hr(),
+                ui.output_ui("design_inputs"),
+            ),
+            ui.div(
+                ui.output_ui("ergebnis_box"),
+                ui.output_ui("formel_box"),
+            ),
+            col_widths=(5, 7),
+        )
+    )
+)
+
+def server(input, output, session):
+
+    @render.ui
+    def design_inputs():
+        d = input.design()
+        if d == "mean":          return inputs_mean
+        if d == "prop":          return inputs_prop
+        if d == "mean_indep":    return inputs_mean_indep
+        if d == "mean_dep":      return inputs_mean_dep
+        if d == "corr":          return inputs_corr
+        if d == "reg_simple":    return inputs_reg_simple
+        if d == "reg_mult_b":    return inputs_reg_mult_b
+        if d == "reg_mult_beta": return inputs_reg_mult_beta
+        if d == "reg_mw":        return inputs_reg_mw
+
+    @reactive.Calc
+    def ergebnis():
+        d = input.design()
+        z = z_wert(input.konfidenz())
+        try:
+            if d == "mean":
+                n = n_mean(z, input.mean_sigma(), input.mean_moe())
+                einheit = "insgesamt"
+            elif d == "prop":
+                n = n_prop(z, input.prop_p(), input.prop_moe())
+                einheit = "insgesamt"
+            elif d == "mean_indep":
+                n = n_mean_indep(z, input.mi_sigma(), input.mi_moe())
+                einheit = "pro Gruppe"
+            elif d == "mean_dep":
+                n = n_mean_dep(z, input.md_sigma_diff(), input.md_moe())
+                einheit = "Personen (Vorher-Nachher)"
+            elif d == "corr":
+                n = n_corr(z, input.corr_r(), input.corr_moe())
+                einheit = "insgesamt"
+            elif d == "reg_simple":
+                n = n_reg_simple(z, input.rs_sigma_e(), input.rs_moe(), input.rs_var_x())
+                einheit = "insgesamt"
+            elif d == "reg_mult_b":
+                n = n_reg_mult_b(z, input.rmb_sigma_e(), input.rmb_moe(), input.rmb_var_x(), input.rmb_vif())
+                einheit = "insgesamt"
+            elif d == "reg_mult_beta":
+                n = n_reg_mult_beta(z, input.rmbeta_r2(), input.rmbeta_vif(), input.rmbeta_moe())
+                einheit = "insgesamt"
+            elif d == "reg_mw":
+                n = n_reg_mw(z, input.rmw_sigma_e(), input.rmw_m(), input.rmw_icc(),
+                             input.rmw_moe(), input.rmw_var_t(), input.rmw_var_g())
+                einheit = "Personen (gesamt)"
+            else:
+                return None, "", z
+            n_int = int(np.ceil(max(1.0, n)))
+            return n_int, einheit, z
+        except Exception as ex:
+            return None, str(ex), z
+
+    @render.ui
+    def ergebnis_box():
+        n, einheit, z = ergebnis()
+        if n is None:
+            return ui.div(ui.h5("Eingabe prüfen"), ui.p(einheit))
+        return ui.div(
+            ui.h4(ui.strong(f"Mindest-N: {n}")),
+            ui.p(f"({einheit})"),
+            ui.p(f"Verwendeter z-Wert bei {input.konfidenz():.2f}%-Konfidenz: {z:.4f}"),
+        )
+
+    @render.ui
+    def formel_box():
+        d = input.design()
+        formeln = {
+            "mean":          "$$N = \\left(\\frac{z \\cdot \\sigma}{\\text{MOE}}\\right)^{2}$$",
+            "prop":          "$$N = \\frac{z^{2} \\cdot p(1-p)}{\\text{MOE}^{2}}$$",
+            "mean_indep":    "$$N = 2 \\cdot \\left(\\frac{z \\cdot \\sigma}{\\text{MOE}}\\right)^{2}\\quad\\text{(pro Gruppe)}$$",
+            "mean_dep":      "$$N = \\left(\\frac{z \\cdot \\sigma_{\\text{diff}}}{\\text{MOE}}\\right)^{2}$$",
+            "corr":          "$$N = 3 + \\left(\\frac{z \\cdot (1 - r^{2})}{\\text{MOE}}\\right)^{2}$$",
+            "reg_simple":    "$$N = 1 + \\frac{z^{2} \\cdot \\sigma_{e}^{2}}{\\text{MOE}^{2} \\cdot \\text{Var}(x)}$$",
+            "reg_mult_b":    "$$N = 1 + \\frac{z^{2} \\cdot \\sigma_{e}^{2} \\cdot \\text{VIF}}{\\text{MOE}^{2} \\cdot \\text{Var}(x)}$$",
+            "reg_mult_beta": "$$N = 1 + \\frac{z^{2} \\cdot (1 - R^{2}) \\cdot \\text{VIF}}{\\text{MOE}^{2}}$$",
+            "reg_mw":        "$$N = \\frac{z^{2} \\cdot \\sigma_{e}^{2} \\cdot [1 + (m-1)\\cdot \\text{ICC}]}{m \\cdot \\text{MOE}^{2} \\cdot \\text{Var}(T) \\cdot \\text{Var}(G)}$$",
+        }
+        return ui.div(
+            ui.hr(),
+            ui.h6("Verwendete Formel"),
+            ui.HTML(f"<p>{formeln.get(d, '')}</p>"),
+        )
+
+app = App(app_ui, server)
+```

@@ -1,7 +1,11 @@
 project:
-  type: website
+  type: book
   output-dir: _site
-  render:
+
+book:
+  title: "Bayesianische Intuition"
+  subtitle: "Ein interaktiver Workshop zur Inferenzstatistik"
+  chapters:
     - index.qmd
     - chap1.qmd
     - chap2.qmd
@@ -9,20 +13,7 @@ project:
     - chap4.qmd
     - chap5.qmd
     - chap6.qmd
-
-website:
-  title: "Bayesianische Intuition"
-  sidebar:
-    style: "docked"
-    search: true
-    contents:
-      - index.qmd
-      - chap1.qmd
-      - chap2.qmd
-      - chap3.qmd
-      - chap4.qmd
-      - chap5.qmd
-      - chap6.qmd
+    - chap7.qmd
 
 execute:
   enabled: false
@@ -33,3 +24,7 @@ format:
     toc: true
     filters:
       - shinylive
+  pdf:
+    documentclass: scrreprt
+    lang: de
+    papersize: a4
