@@ -3,14 +3,15 @@ title: "7. Mindeststichproben-Rechner"
 format: html
 ---
 
-Tool zur Berechnung der Mindeststichprobengröße für verschiedene Studiendesigns auf Basis der Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, Designparameter und tolerierbare Fehler sind frei wählbar; das Tool gibt das nötige $N$ zurück.
+Tool zur Berechnung der Mindeststichprobengröße für verschiedene Studiendesigns auf Basis der Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, Designparameter und tolerierbare Fehler sind frei wählbar; das Tool gibt das nötige $N$ zurück und visualisiert den Verlauf $N(\text{MOE})$.
 
 ```{shinylive-python}
 #| standalone: true
-#| viewerHeight: 900
+#| viewerHeight: 1000
 
 from shiny import App, render, ui, reactive
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.stats import norm
 
 DESIGNS = {
@@ -25,36 +26,55 @@ DESIGNS = {
     "reg_mw":       "9. Interaktionseffekt (multiple Regression mit Messwiederholung)",
 }
 
+FORMELN = {
+    "mean":          r"$N = \left(\dfrac{z \cdot \sigma}{\mathrm{MOE}}\right)^{2}$",
+    "prop":          r"$N = \dfrac{z^{2} \cdot p\,(1-p)}{\mathrm{MOE}^{2}}$",
+    "mean_indep":    r"$N = 2 \cdot \left(\dfrac{z \cdot \sigma}{\mathrm{MOE}}\right)^{2}\ \ \mathrm{pro\ Gruppe}$",
+    "mean_dep":      r"$N = \left(\dfrac{z \cdot \sigma_{\mathrm{diff}}}{\mathrm{MOE}}\right)^{2}$",
+    "corr":          r"$N = 3 + \left(\dfrac{z \cdot (1 - r^{2})}{\mathrm{MOE}}\right)^{2}$",
+    "reg_simple":    r"$N = 1 + \dfrac{z^{2} \cdot \sigma_{e}^{2}}{\mathrm{MOE}^{2} \cdot \mathrm{Var}(x)}$",
+    "reg_mult_b":    r"$N = 1 + \dfrac{z^{2} \cdot \sigma_{e}^{2} \cdot \mathrm{VIF}}{\mathrm{MOE}^{2} \cdot \mathrm{Var}(x)}$",
+    "reg_mult_beta": r"$N = 1 + \dfrac{z^{2} \cdot (1 - R^{2}) \cdot \mathrm{VIF}}{\mathrm{MOE}^{2}}$",
+    "reg_mw":        r"$N = \dfrac{z^{2} \cdot \sigma_{e}^{2} \cdot [1 + (m-1)\,\mathrm{ICC}]}{m \cdot \mathrm{MOE}^{2} \cdot \mathrm{Var}(T) \cdot \mathrm{Var}(G)}$",
+}
+
+MOE_RANGE = {
+    "mean":          (0.1,   20.0),
+    "prop":          (0.005, 0.5),
+    "mean_indep":    (0.05,  5.0),
+    "mean_dep":      (0.05,  5.0),
+    "corr":          (0.01,  0.5),
+    "reg_simple":    (0.005, 0.2),
+    "reg_mult_b":    (0.005, 0.2),
+    "reg_mult_beta": (0.005, 0.2),
+    "reg_mw":        (0.1,   5.0),
+}
+
 def z_wert(konfidenz):
     alpha = 1 - konfidenz / 100.0
     return norm.ppf(1 - alpha / 2.0)
 
-def n_mean(z, sigma, moe):
-    return (z * sigma / moe) ** 2
-
-def n_prop(z, p, moe):
-    return (z ** 2) * p * (1 - p) / (moe ** 2)
-
-def n_mean_indep(z, sigma, moe):
-    return 2 * (z * sigma / moe) ** 2
-
-def n_mean_dep(z, sigma_diff, moe):
-    return (z * sigma_diff / moe) ** 2
-
-def n_corr(z, r, moe):
-    return 3 + (z * (1 - r ** 2) / moe) ** 2
-
-def n_reg_simple(z, sigma_e, moe, var_x):
-    return 1 + (z ** 2) * (sigma_e ** 2) / ((moe ** 2) * var_x)
-
-def n_reg_mult_b(z, sigma_e, moe, var_x, vif):
-    return 1 + (z ** 2) * (sigma_e ** 2) * vif / ((moe ** 2) * var_x)
-
-def n_reg_mult_beta(z, r2, vif, moe):
-    return 1 + (z ** 2) * (1 - r2) * vif / (moe ** 2)
-
+def n_mean(z, sigma, moe):                       return (z * sigma / moe) ** 2
+def n_prop(z, p, moe):                           return (z ** 2) * p * (1 - p) / (moe ** 2)
+def n_mean_indep(z, sigma, moe):                 return 2 * (z * sigma / moe) ** 2
+def n_mean_dep(z, sigma_diff, moe):              return (z * sigma_diff / moe) ** 2
+def n_corr(z, r, moe):                           return 3 + (z * (1 - r ** 2) / moe) ** 2
+def n_reg_simple(z, sigma_e, moe, var_x):        return 1 + (z ** 2) * (sigma_e ** 2) / ((moe ** 2) * var_x)
+def n_reg_mult_b(z, sigma_e, moe, var_x, vif):   return 1 + (z ** 2) * (sigma_e ** 2) * vif / ((moe ** 2) * var_x)
+def n_reg_mult_beta(z, r2, vif, moe):            return 1 + (z ** 2) * (1 - r2) * vif / (moe ** 2)
 def n_reg_mw(z, sigma_e, m, icc, moe, var_t, var_g):
     return ((z ** 2) * (sigma_e ** 2) * (1 + (m - 1) * icc)) / (m * (moe ** 2) * var_t * var_g)
+
+def n_fuer_design(d, z, inp, moe):
+    if d == "mean":          return n_mean(z, inp["sigma"], moe)
+    if d == "prop":          return n_prop(z, inp["p"], moe)
+    if d == "mean_indep":    return n_mean_indep(z, inp["sigma"], moe)
+    if d == "mean_dep":      return n_mean_dep(z, inp["sigma_diff"], moe)
+    if d == "corr":          return n_corr(z, inp["r"], moe)
+    if d == "reg_simple":    return n_reg_simple(z, inp["sigma_e"], moe, inp["var_x"])
+    if d == "reg_mult_b":    return n_reg_mult_b(z, inp["sigma_e"], moe, inp["var_x"], inp["vif"])
+    if d == "reg_mult_beta": return n_reg_mult_beta(z, inp["r2"], inp["vif"], moe)
+    if d == "reg_mw":        return n_reg_mw(z, inp["sigma_e"], inp["m"], inp["icc"], moe, inp["var_t"], inp["var_g"])
 
 inputs_mean = ui.div(
     ui.input_numeric("mean_sigma", "Geschätzte Streuung sigma der Population", value=10.0, min=0.0001, step=0.1),
@@ -77,9 +97,9 @@ inputs_corr = ui.div(
     ui.input_numeric("corr_moe", "Tolerierbare MOE für r",                          value=0.1,  min=0.0001, step=0.01),
 )
 inputs_reg_simple = ui.div(
-    ui.input_numeric("rs_sigma_e", "Residual-Streuung sigma_e (oder konservativ SD des Kriteriums)", value=2.0,  min=0.0001, step=0.1),
-    ui.input_numeric("rs_var_x",   "Varianz des Prädiktors Var(x)",                                  value=225.0, min=0.0001, step=1.0),
-    ui.input_numeric("rs_moe",     "Tolerierbare MOE für b",                                          value=0.025, min=0.000001, step=0.005),
+    ui.input_numeric("rs_sigma_e", "Residual-Streuung sigma_e", value=2.0,  min=0.0001, step=0.1),
+    ui.input_numeric("rs_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
+    ui.input_numeric("rs_moe",     "Tolerierbare MOE für b", value=0.025, min=0.000001, step=0.005),
 )
 inputs_reg_mult_b = ui.div(
     ui.input_numeric("rmb_sigma_e", "Residual-Streuung sigma_e", value=2.0,  min=0.0001, step=0.1),
@@ -110,11 +130,10 @@ app_ui = ui.page_fluid(
                 ui.input_numeric("konfidenz", "Konfidenzniveau in % (z. B. 95 oder 99)", value=95.0, min=50.0, max=99.99, step=1.0),
                 ui.hr(),
                 ui.output_ui("design_inputs"),
-            ),
-            ui.div(
+                ui.hr(),
                 ui.output_ui("ergebnis_box"),
-                ui.output_ui("formel_box"),
             ),
+            ui.output_plot("formel_plot", height="700px"),
             col_widths=(5, 7),
         )
     )
@@ -136,75 +155,114 @@ def server(input, output, session):
         if d == "reg_mw":        return inputs_reg_mw
 
     @reactive.Calc
+    def aktuelle_eingaben():
+        d = input.design()
+        if d == "mean":
+            return {"sigma": input.mean_sigma()}, input.mean_moe()
+        if d == "prop":
+            return {"p": input.prop_p()}, input.prop_moe()
+        if d == "mean_indep":
+            return {"sigma": input.mi_sigma()}, input.mi_moe()
+        if d == "mean_dep":
+            return {"sigma_diff": input.md_sigma_diff()}, input.md_moe()
+        if d == "corr":
+            return {"r": input.corr_r()}, input.corr_moe()
+        if d == "reg_simple":
+            return {"sigma_e": input.rs_sigma_e(), "var_x": input.rs_var_x()}, input.rs_moe()
+        if d == "reg_mult_b":
+            return {"sigma_e": input.rmb_sigma_e(), "var_x": input.rmb_var_x(), "vif": input.rmb_vif()}, input.rmb_moe()
+        if d == "reg_mult_beta":
+            return {"r2": input.rmbeta_r2(), "vif": input.rmbeta_vif()}, input.rmbeta_moe()
+        if d == "reg_mw":
+            return ({"sigma_e": input.rmw_sigma_e(), "m": input.rmw_m(), "icc": input.rmw_icc(),
+                     "var_t": input.rmw_var_t(), "var_g": input.rmw_var_g()}, input.rmw_moe())
+
+    @reactive.Calc
     def ergebnis():
         d = input.design()
         z = z_wert(input.konfidenz())
         try:
-            if d == "mean":
-                n = n_mean(z, input.mean_sigma(), input.mean_moe())
-                einheit = "insgesamt"
-            elif d == "prop":
-                n = n_prop(z, input.prop_p(), input.prop_moe())
-                einheit = "insgesamt"
-            elif d == "mean_indep":
-                n = n_mean_indep(z, input.mi_sigma(), input.mi_moe())
-                einheit = "pro Gruppe"
-            elif d == "mean_dep":
-                n = n_mean_dep(z, input.md_sigma_diff(), input.md_moe())
-                einheit = "Personen (Vorher-Nachher)"
-            elif d == "corr":
-                n = n_corr(z, input.corr_r(), input.corr_moe())
-                einheit = "insgesamt"
-            elif d == "reg_simple":
-                n = n_reg_simple(z, input.rs_sigma_e(), input.rs_moe(), input.rs_var_x())
-                einheit = "insgesamt"
-            elif d == "reg_mult_b":
-                n = n_reg_mult_b(z, input.rmb_sigma_e(), input.rmb_moe(), input.rmb_var_x(), input.rmb_vif())
-                einheit = "insgesamt"
-            elif d == "reg_mult_beta":
-                n = n_reg_mult_beta(z, input.rmbeta_r2(), input.rmbeta_vif(), input.rmbeta_moe())
-                einheit = "insgesamt"
-            elif d == "reg_mw":
-                n = n_reg_mw(z, input.rmw_sigma_e(), input.rmw_m(), input.rmw_icc(),
-                             input.rmw_moe(), input.rmw_var_t(), input.rmw_var_g())
-                einheit = "Personen (gesamt)"
-            else:
-                return None, "", z
+            inp, moe = aktuelle_eingaben()
+            n = n_fuer_design(d, z, inp, moe)
             n_int = int(np.ceil(max(1.0, n)))
-            return n_int, einheit, z
+            return n_int, z, inp, moe
         except Exception as ex:
-            return None, str(ex), z
+            return None, 0, {}, 0
+
+    EINHEIT = {
+        "mean":          "insgesamt",
+        "prop":          "insgesamt",
+        "mean_indep":    "pro Gruppe",
+        "mean_dep":      "Personen (Vorher-Nachher)",
+        "corr":          "insgesamt",
+        "reg_simple":    "insgesamt",
+        "reg_mult_b":    "insgesamt",
+        "reg_mult_beta": "insgesamt",
+        "reg_mw":        "Personen (gesamt)",
+    }
 
     @render.ui
     def ergebnis_box():
-        n, einheit, z = ergebnis()
-        if n is None:
-            return ui.div(ui.h5("Eingabe prüfen"), ui.p(einheit))
+        res = ergebnis()
+        if res[0] is None:
+            return ui.div(ui.h5("Eingabe prüfen"))
+        n_int, z, _, _ = res
+        d = input.design()
         return ui.div(
-            ui.h4(ui.strong(f"Mindest-N: {n}")),
-            ui.p(f"({einheit})"),
-            ui.p(f"Verwendeter z-Wert bei {input.konfidenz():.2f}%-Konfidenz: {z:.4f}"),
+            ui.h3(ui.strong(f"Mindest-N: {n_int}")),
+            ui.p(f"({EINHEIT[d]})"),
+            ui.p(f"z-Wert bei {input.konfidenz():.2f}%-Konfidenz: {z:.4f}"),
         )
 
-    @render.ui
-    def formel_box():
+    @render.plot
+    def formel_plot():
         d = input.design()
-        formeln = {
-            "mean":          "$$N = \\left(\\frac{z \\cdot \\sigma}{\\text{MOE}}\\right)^{2}$$",
-            "prop":          "$$N = \\frac{z^{2} \\cdot p(1-p)}{\\text{MOE}^{2}}$$",
-            "mean_indep":    "$$N = 2 \\cdot \\left(\\frac{z \\cdot \\sigma}{\\text{MOE}}\\right)^{2}\\quad\\text{(pro Gruppe)}$$",
-            "mean_dep":      "$$N = \\left(\\frac{z \\cdot \\sigma_{\\text{diff}}}{\\text{MOE}}\\right)^{2}$$",
-            "corr":          "$$N = 3 + \\left(\\frac{z \\cdot (1 - r^{2})}{\\text{MOE}}\\right)^{2}$$",
-            "reg_simple":    "$$N = 1 + \\frac{z^{2} \\cdot \\sigma_{e}^{2}}{\\text{MOE}^{2} \\cdot \\text{Var}(x)}$$",
-            "reg_mult_b":    "$$N = 1 + \\frac{z^{2} \\cdot \\sigma_{e}^{2} \\cdot \\text{VIF}}{\\text{MOE}^{2} \\cdot \\text{Var}(x)}$$",
-            "reg_mult_beta": "$$N = 1 + \\frac{z^{2} \\cdot (1 - R^{2}) \\cdot \\text{VIF}}{\\text{MOE}^{2}}$$",
-            "reg_mw":        "$$N = \\frac{z^{2} \\cdot \\sigma_{e}^{2} \\cdot [1 + (m-1)\\cdot \\text{ICC}]}{m \\cdot \\text{MOE}^{2} \\cdot \\text{Var}(T) \\cdot \\text{Var}(G)}$$",
-        }
-        return ui.div(
-            ui.hr(),
-            ui.h6("Verwendete Formel"),
-            ui.HTML(f"<p>{formeln.get(d, '')}</p>"),
+        res = ergebnis()
+        if res[0] is None:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.text(0.5, 0.5, "Eingabe prüfen", ha="center", va="center", transform=ax.transAxes)
+            ax.set_axis_off()
+            return fig
+
+        n_int, z, inp, moe_aktuell = res
+
+        fig, (ax_form, ax_plot) = plt.subplots(
+            2, 1, figsize=(9, 8.5), gridspec_kw={"height_ratios": [1, 4]}
         )
+
+        ax_form.text(0.5, 0.5, FORMELN[d], ha="center", va="center", fontsize=18, transform=ax_form.transAxes)
+        ax_form.set_axis_off()
+        ax_form.set_title("Verwendete Formel", fontsize=12, loc="left")
+
+        moe_min, moe_max = MOE_RANGE[d]
+        moe_grid = np.linspace(moe_min, moe_max, 400)
+        n_grid = np.array([n_fuer_design(d, z, inp, m) for m in moe_grid])
+        n_grid = np.clip(n_grid, 1, None)
+
+        ax_plot.plot(moe_grid, n_grid, color="#27ae60", linewidth=2.5)
+        ax_plot.fill_between(moe_grid, 0, n_grid, color="#27ae60", alpha=0.12)
+
+        moe_clip = min(max(moe_aktuell, moe_min), moe_max)
+        n_aktuell = n_fuer_design(d, z, inp, moe_clip)
+        n_aktuell = max(1, n_aktuell)
+        ax_plot.axvline(moe_clip, color="#3498db", linestyle="dotted", linewidth=2)
+        ax_plot.scatter([moe_clip], [n_aktuell], color="#3498db", s=120, zorder=5,
+                        label=f"Aktuelle Wahl: MOE = {moe_aktuell:g}, N = {n_int}")
+
+        y_max = min(np.percentile(n_grid, 95) * 1.5, n_grid.max())
+        y_max = max(y_max, n_aktuell * 1.2, 10)
+        ax_plot.set_xlim(moe_min, moe_max)
+        ax_plot.set_ylim(0, y_max)
+        ax_plot.set_xlabel("Margin of Error (MOE)")
+        ax_plot.set_ylabel("Mindest-N")
+        ax_plot.set_title(f"N in Abhängigkeit der MOE  ({DESIGNS[d]})", fontsize=11)
+        ax_plot.legend(loc="upper right", fontsize=10)
+        ax_plot.grid(alpha=0.3)
+        ax_plot.spines['top'].set_visible(False)
+        ax_plot.spines['right'].set_visible(False)
+
+        plt.tight_layout()
+        return fig
 
 app = App(app_ui, server)
 ```
