@@ -5,8 +5,6 @@ format: html
 
 Tool zur Berechnung der Mindeststichprobengröße für verschiedene Studiendesigns auf Basis der tolerierbaren Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, vorher zu schätzende Designparameter und tolerierbare MOE sind frei wählbar; das Tool gibt das nötige $N$ zurück und visualisiert den Verlauf $N(\text{MOE})$.
 
-#TODO: Füge hier erklärung hinzu.
-
 ```{shinylive-python}
 #| standalone: true
 #| viewerHeight: 1000
@@ -318,50 +316,77 @@ def server(input, output, session):
         except Exception as ex:
             return None, 0, {}, 0
 
-    # Label für die primär ausgegebene Größe (Mindest-N)
+    # Kurze, sinnvolle Einheit der Hauptzahl (Mindest-N) je Design.
     EINHEIT = {
-        "mean":          "insgesamt",
-        "prop":          "insgesamt",
-        "mean_indep":    "pro Gruppe",
-        "mean_dep":      "Personen (Vorher-Nachher)",
-        "corr":          "insgesamt",
-        "reg_simple":    "insgesamt",
-        "reg_mult_b":    "insgesamt",
-        "reg_mult_beta": "insgesamt",
-        "reg_mw":        "Personen (gesamt)",
+        "mean":          "Personen insgesamt",
+        "prop":          "Personen insgesamt",
+        "mean_indep":    "Personen pro Gruppe",
+        "mean_dep":      "Personen insgesamt",
+        "corr":          "Personen insgesamt",
+        "reg_simple":    "Personen insgesamt",
+        "reg_mult_b":    "Personen insgesamt",
+        "reg_mult_beta": "Personen insgesamt",
+        "reg_mw":        "Personen insgesamt",
     }
 
-    def gesamt_n_info(d, n_int):
-        """Gibt (Label, Wert) der zusätzlichen Zeile zurück, oder None.
+    def zusatz_info(d, n_int):
+        """Zusatzzeile nur dort, wo sie inhaltlich Sinn ergibt.
 
-        D3: n_int ist pro Gruppe -> Gesamt-N = 2 * n_int.
-        D9: n_int ist Gesamt-N   -> pro Gruppe = ceil(n_int / 2).
-        D4: keine Zusatzzeile (n_int ist bereits Personenzahl gesamt).
+        D3 (mean_indep): Hauptzahl ist pro Gruppe -> Gesamt = 2 * n.
+        D9 (reg_mw):      Hauptzahl ist Gesamt-N  -> pro Gruppe = ceil(n / 2).
+        Alle anderen Designs: keine Zusatzzeile.
         """
         if d == "mean_indep":
-            return "Gesamt-N (beide Gruppen)", 2 * n_int
+            return "Gesamt (beide Gruppen)", 2 * n_int
         if d == "reg_mw":
             return "pro Gruppe (bei 2 Gruppen)", int(np.ceil(n_int / 2))
         return None
+
+    # Einheitliche Stildefinitionen, damit Schriftgrößen/-gewichte nicht
+    # wahllos wechseln (kein Mix aus h3/h4/strong mehr).
+    S_KAPITEL = "margin:0; font-size:0.85rem; color:#7f8c8d;"          # kleines Label
+    S_HAUPT   = "margin:0; font-size:2.2rem; font-weight:700; line-height:1.1;"  # große Zahl
+    S_EINHEIT = "margin:0.1rem 0 0.9rem 0; font-size:0.9rem; color:#7f8c8d;"     # Einheit unter Zahl
+    S_META_W  = "margin:0 0 0.5rem 0; font-size:1rem; font-weight:500;"          # Kennwerte
 
     @render.ui
     def ergebnis_box():
         res = ergebnis()
         if res[0] is None:
-            return ui.div(ui.h5("Eingabe prüfen"))
+            return ui.div(
+                ui.p("Mindest-Stichprobengröße", style=S_KAPITEL),
+                ui.p("Eingabe prüfen", style="margin:0; font-size:1.2rem; font-weight:600;"),
+            )
+
         n_int, z, _, _ = res
         d = input.design()
 
-        zeilen = [
-            ui.h3(ui.strong(f"Mindest-N: {n_int}")),
-            ui.p(f"({EINHEIT[d]})"),
+        bloecke = [
+            ui.div(
+                ui.p("Mindest-Stichprobengröße", style=S_KAPITEL),
+                ui.p(f"{n_int}", style=S_HAUPT),
+                ui.p(EINHEIT[d], style=S_EINHEIT),
+            )
         ]
-        zusatz = gesamt_n_info(d, n_int)
+
+        zusatz = zusatz_info(d, n_int)
         if zusatz is not None:
             label, wert = zusatz
-            zeilen.append(ui.h4(ui.strong(f"{label}: {wert}")))
-        zeilen.append(ui.p(f"z-Wert bei {input.konfidenz():.2f}%-Konfidenz: {z:.4f}"))
-        return ui.div(*zeilen)
+            bloecke.append(
+                ui.div(
+                    ui.p(label, style=S_KAPITEL),
+                    ui.p(f"{wert}", style=S_META_W),
+                )
+            )
+
+        bloecke.append(
+            ui.div(
+                ui.p(f"Konfidenzniveau {input.konfidenz():.2f}%", style=S_KAPITEL),
+                ui.p(f"z = {z:.4f}", style=S_META_W),
+            )
+        )
+
+        return ui.div(*bloecke)
 
     @render.plot
     def formel_plot():
@@ -401,14 +426,9 @@ def server(input, output, session):
         # --- Robuste Y-Achse ---
         # Feste Untergrenze 0; Obergrenze so, dass der aktuelle Punkt IMMER
         # vollständig sichtbar ist (Priorität Punkt), die Kurve darf oben raus.
-        # Basis ist das 95%-Perzentil der Kurve, damit steile Äste nicht alles
-        # plattdrücken; der Punkt erzwingt aber eine Mindesthöhe inkl. Puffer.
         kurven_basis = np.percentile(n_grid, 95) * 1.5
-        punkt_bedarf = n_aktuell * 1.2  # 20% Luft über dem Punkt + Legende
+        punkt_bedarf = n_aktuell * 1.2
         y_max = max(kurven_basis, punkt_bedarf, 10)
-
-        # Sicherheitsnetz: falls Rundungen den Punkt minimal über die Grenze
-        # schieben, Punkt garantiert einschließen.
         if y_max <= n_aktuell:
             y_max = n_aktuell * 1.2
 
