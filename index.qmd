@@ -1,0 +1,19 @@
+# Willkommen {-}
+ 
+Dieses Buch stellt einen interaktiven **Mindeststichproben-Rechner** für verschiedene Studiendesigns bereit.
+ 
+Die Berechnung erfolgt auf Basis der tolerierbaren Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, die vorher zu schätzenden Designparameter und die tolerierbare MOE sind frei wählbar; das Tool gibt das nötige $N$ zurück und visualisiert den Verlauf $N(\text{MOE})$.
+ 
+Abgedeckte Designs:
+ 
+1. Mittelwert
+2. Anteil
+3. Mittelwertsunterschied (unabhängige Messungen)
+4. Mittelwertsunterschied (abhängige Messungen)
+5. Korrelationskoeffizient
+6. Regressionskoeffizient (einfache Regression, unstandardisiert)
+7. Regressionskoeffizient (multiple Regression, unstandardisiert)
+8. Regressionskoeffizient (multiple Regression, standardisiert)
+9. Interaktionseffekt (multiple Regression mit Messwiederholung)
+Nutze die Navigation, um zum Rechner zu gelangen.
+ 
