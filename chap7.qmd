@@ -1,9 +1,11 @@
 ---
-title: "7. Mindeststichproben-Rechner"
+title: "Mindeststichproben-Rechner"
 format: html
 ---
 
-Tool zur Berechnung der Mindeststichprobengröße für verschiedene Studiendesigns auf Basis der Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, Designparameter und tolerierbare Fehler sind frei wählbar; das Tool gibt das nötige $N$ zurück und visualisiert den Verlauf $N(\text{MOE})$.
+Tool zur Berechnung der Mindeststichprobengröße für verschiedene Studiendesigns auf Basis der tolerierbaren Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, vorher zu schätzende Designparameter und tolerierbare MOE sind frei wählbar; das Tool gibt das nötige $N$ zurück und visualisiert den Verlauf $N(\text{MOE})$.
+
+#TODO: Füge hier erklärung hinzu.
 
 ```{shinylive-python}
 #| standalone: true
@@ -50,6 +52,114 @@ MOE_RANGE = {
     "reg_mw":        (0.1,   5.0),
 }
 
+HINWEISE = {
+    "mean":
+        "Für die Berechnung der Mindeststichprobengröße für einen Mittelwert musst du "
+        "vorher grob die Streuung der Daten in der Population schätzen (auf Grundlage der "
+        "Literatur, eigener Vorstudien, oder von Plausibilitätsüberlegungen).",
+    "prop":
+        "Für die Berechnung der Mindeststichprobengröße für einen Anteil musst du vorher "
+        "grob diesen Anteil in der Population schätzen (auf Grundlage der Literatur, "
+        "eigener Vorstudien, oder von Plausibilitätsüberlegungen).",
+    "mean_indep":
+        "Für die Berechnung der Mindeststichprobengröße für einen Mittelwertsunterschied "
+        "bei unabhängigen Messungen musst du vorher grob die Streuung der Daten pro Gruppe "
+        "in der Population schätzen (auf Grundlage der Literatur, eigener Vorstudien, oder "
+        "von Plausibilitätsüberlegungen). Die Berechnung geht dabei von etwa gleichen "
+        "Streuungen in beiden Gruppen aus. Falls sich die Schätzungen für die beiden "
+        "Gruppen unterscheiden sollten, setze die größere Streuung ein – das führt zu "
+        "einer konservativen Schätzung von N.",
+    "mean_dep":
+        "Für die Berechnung der Mindeststichprobengröße für einen Mittelwertsunterschied "
+        "bei abhängigen Messungen musst du vorher grob die Streuung der Differenzwerte in "
+        "der Population schätzen (auf Grundlage der Literatur, eigener Vorstudien, oder von "
+        "Plausibilitätsüberlegungen).\n\n"
+        "Für psychologische Variablen ist es oft schwierig, in der Literatur gute "
+        "Anhaltspunkte für die Streuung der Differenzwerte zu finden. Wenn du keine eigene "
+        "Vorstudie durchführen kannst, lässt sich die Streuung daher nur sehr grob "
+        "abschätzen. Als Faustregel kann man annehmen, dass die Standardabweichung der "
+        "Differenzwerte in vielen Fällen in der Größenordnung von etwa der Hälfte bis drei "
+        "Vierteln der Standardabweichung der Personenwerte liegt (also die Streuung, die "
+        "man für unabhängige Messungen verwendet). Da sich diese Streuung in der Regel "
+        "leichter aus bereits vorliegenden Studien ableiten lässt, kann sie als grobe "
+        "Orientierung für abhängige Designs dienen.",
+    "corr":
+        "Für die Berechnung der Mindeststichprobengröße für einen Korrelationskoeffizienten "
+        "musst du dessen Größe in der Population vorher grob schätzen (auf Grundlage der "
+        "Literatur, eigener Vorstudien, oder von Plausibilitätsüberlegungen).",
+    "reg_simple":
+        "Für die Berechnung der Mindeststichprobengröße für einen unstandardisierten "
+        "Regressionskoeffizienten in der einfachen linearen Regression musst du vorab die "
+        "Residualvarianz und die Varianz des Prädiktors grob schätzen (auf Grundlage der "
+        "Literatur, eigener Vorstudien, oder von Plausibilitätsüberlegungen).\n\n"
+        "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
+        "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
+        "näherungsweise durch die Gesamtstreuung des Kriteriums zu ersetzen, also dessen "
+        "vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
+        "vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
+        "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
+        "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
+        "Planung der Mindeststichprobengröße gut geeignet.)",
+    "reg_mult_b":
+        "Für die Berechnung der Mindeststichprobengröße für einen unstandardisierten "
+        "Regressionskoeffizienten in der Multiplen Regression musst du vorab die "
+        "Residualvarianz und die Varianz des Prädiktors, um den es geht, sowie den VIF grob "
+        "schätzen (auf Grundlage der Literatur, eigener Vorstudien, oder von "
+        "Plausibilitätsüberlegungen).\n\n"
+        "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
+        "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
+        "näherungsweise durch die Gesamtstreuung des Kriteriums zu ersetzen, also dessen "
+        "vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
+        "vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
+        "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
+        "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
+        "Planung der Mindeststichprobengröße gut geeignet.)\n\n"
+        "Hast du gar keinen Anhaltspunkt für die Höhe des VIF, solltest du verschiedene "
+        "Möglichkeiten durchspielen, um zu sehen, in welchem Bereich die notwendige "
+        "Stichprobengröße dann liegt. Ein sehr grober (!) Anhaltspunkt für die typische "
+        "Höhe des VIF ist ein Wert von 1,5, aber vor allem bei größeren Regressionsmodellen "
+        "kann er auch deutlich höher liegen (etwa bei 5).",
+    "reg_mult_beta":
+        "Für die Berechnung der Mindeststichprobengröße für einen standardisierten "
+        "Regressionskoeffizienten in der Multiplen Regression musst du vorab die "
+        "Gesamtvarianzaufklärung des Modells sowie den VIF grob schätzen (auf Grundlage der "
+        "Literatur, eigener Vorstudien, oder von Plausibilitätsüberlegungen).\n\n"
+        "Hast du gar keinen Anhaltspunkt für die Höhe des VIF, solltest du verschiedene "
+        "Möglichkeiten durchspielen, um zu sehen, in welchem Bereich die notwendige "
+        "Stichprobengröße dann liegt. Ein sehr grober (!) Anhaltspunkt für die typische "
+        "Höhe des VIF ist ein Wert von 1,5, aber vor allem bei größeren Regressionsmodellen "
+        "kann er auch deutlich höher liegen (etwa bei 5).",
+    "reg_mw":
+        "Für die Berechnung der Mindeststichprobengröße für einen unstandardisierten "
+        "Interaktionseffekt in der Multiplen Regression (klassischer Effekt einer "
+        "2x2-Interventionsstudie) musst du vorab die Anzahl der Messungen pro Person "
+        "eintragen (bei einer 2x2-Studie also 2), die Residualvarianz und den ICC grob "
+        "schätzen (auf Grundlage der Literatur, eigener Vorstudien, oder von "
+        "Plausibilitätsüberlegungen) sowie die Varianz der Zeit- und der Gruppencodierung "
+        "ermitteln.\n\n"
+        "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
+        "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
+        "näherungsweise durch die Gesamtstreuung des Kriteriums zu ersetzen, also dessen "
+        "vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
+        "vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
+        "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
+        "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
+        "Planung der Mindeststichprobengröße gut geeignet.)\n\n"
+        "Der ICC entspricht der Korrelation der wiederholten Messungen innerhalb der "
+        "Personen. Er ist aus vorauslaufenden Studien typischerweise grob bekannt. Typische "
+        "Werte liegen zwischen .3 und .7. Hat man keinen Anhaltspunkt, kann man .5 als "
+        "Schätzung verwenden.\n\n"
+        "Die Varianzen der beiden Prädiktoren Zeit (Var(T)) und Gruppe (Var(G)) müssen "
+        "nicht geschätzt werden, sondern hängen direkt von der verwendeten Dummy-Codierung "
+        "ab. Typisch ist eine Codierung mit Kontrollgruppe = 0 und Therapiegruppe = 1 sowie "
+        "pre-Messung = 0 und post-Messung = 1. Die Varianz der beiden Werte 0 und 1 beträgt "
+        "0,25. Somit betragen die beiden Varianzen 0,25. Hast du eine andere Codierung "
+        "verwendet, musst du die Varianz entsprechend zunächst berechnen.\n\n"
+        "Die Formel gilt für experimentelle Designs mit etwa gleich großen Gruppen. Sie "
+        "gibt das Gesamt-N aus, das auf die Gruppen verteilt wird. Beträgt es z. B. 200, "
+        "werden bei zwei Gruppen je 100 Personen benötigt.",
+}
+
 def z_wert(konfidenz):
     alpha = 1 - konfidenz / 100.0
     return norm.ppf(1 - alpha / 2.0)
@@ -76,41 +186,59 @@ def n_fuer_design(d, z, inp, moe):
     if d == "reg_mult_beta": return n_reg_mult_beta(z, inp["r2"], inp["vif"], moe)
     if d == "reg_mw":        return n_reg_mw(z, inp["sigma_e"], inp["m"], inp["icc"], moe, inp["var_t"], inp["var_g"])
 
+def hinweis_panel(d):
+    """Eingeklapptes Accordion mit dem designspezifischen Hinweis."""
+    absaetze = HINWEISE[d].split("\n\n")
+    inhalt = ui.div(*[ui.p(t) for t in absaetze])
+    return ui.accordion(
+        ui.accordion_panel("Hinweis: Was muss ich vorher schätzen?", inhalt),
+        id=f"hinweis_acc_{d}",
+        open=False,
+    )
+
 inputs_mean = ui.div(
-    ui.input_numeric("mean_sigma", "Geschätzte Streuung sigma der Population", value=10.0, min=0.0001, step=0.1),
+    ui.input_numeric("mean_sigma", "Geschätzte Standardabweichung sigma in der Population", value=10.0, min=0.0001, step=0.1),
     ui.input_numeric("mean_moe",   "Tolerierbare MOE",                          value=2.0,  min=0.0001, step=0.1),
+    hinweis_panel("mean"),
 )
 inputs_prop = ui.div(
     ui.input_numeric("prop_p",   "Geschätzter Anteil p (zwischen 0 und 1)", value=0.15, min=0.0001, max=0.9999, step=0.01),
     ui.input_numeric("prop_moe", "Tolerierbare MOE (in Anteilseinheiten)",  value=0.05, min=0.0001, step=0.01),
+    hinweis_panel("prop"),
 )
 inputs_mean_indep = ui.div(
-    ui.input_numeric("mi_sigma", "Geschätzte Streuung sigma pro Gruppe", value=2.0, min=0.0001, step=0.1),
-    ui.input_numeric("mi_moe",   "Tolerierbare MOE für die Differenz",    value=0.5, min=0.0001, step=0.1),
+    ui.input_numeric("mi_sigma", "Geschätzte Standardabweichung sigma pro Gruppe", value=2.0, min=0.0001, step=0.1),
+    ui.input_numeric("mi_moe",   "Tolerierbare MOE für die Mittelwertsunterschiede",    value=0.5, min=0.0001, step=0.1),
+    hinweis_panel("mean_indep"),
 )
 inputs_mean_dep = ui.div(
-    ui.input_numeric("md_sigma_diff", "Geschätzte Streuung der Differenzwerte sigma_diff", value=5.0, min=0.0001, step=0.1),
-    ui.input_numeric("md_moe",        "Tolerierbare MOE für den Differenz-Mittelwert",     value=1.0, min=0.0001, step=0.1),
+    ui.input_numeric("md_sigma_diff", "Geschätzte Standardabweichung der Differenzwerte sigma_diff", value=5.0, min=0.0001, step=0.1),
+    ui.input_numeric("md_moe",        "Tolerierbare MOE für den Mittelwertsunterschiede",     value=1.0, min=0.0001, step=0.1),
+    hinweis_panel("mean_dep"),
 )
 inputs_corr = ui.div(
-    ui.input_numeric("corr_r",   "Vermuteter Korrelationskoeffizient r (-1 bis 1)", value=0.3,  min=-0.99, max=0.99, step=0.05),
+    ui.input_numeric("corr_r",   "Vermuteter Korrelationskoeffizient r (-1 bis 1) in der Population", value=0.3,  min=-0.99, max=0.99, step=0.05),
     ui.input_numeric("corr_moe", "Tolerierbare MOE für r",                          value=0.1,  min=0.0001, step=0.01),
+    hinweis_panel("corr"),
 )
 inputs_reg_simple = ui.div(
-    ui.input_numeric("rs_sigma_e", "Residual-Streuung sigma_e", value=2.0,  min=0.0001, step=0.1),
+    ui.input_numeric("rs_sigma_e", "Residualvarianz sigma_e", value=2.0,  min=0.0001, step=0.1),
     ui.input_numeric("rs_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
     ui.input_numeric("rs_moe",     "Tolerierbare MOE für b", value=0.025, min=0.000001, step=0.005),
+    hinweis_panel("reg_simple"),
 )
 inputs_reg_mult_b = ui.div(
-    ui.input_numeric("rmb_sigma_e", "Residual-Streuung sigma_e", value=2.0,  min=0.0001, step=0.1),
+    ui.input_numeric("rmb_sigma_e", "Residualvarianz sigma_e", value=2.0,  min=0.0001, step=0.1),
     ui.input_numeric("rmb_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
     ui.input_numeric("rmb_vif",     "Variance Inflation Factor (VIF)", value=1.5, min=1.0, step=0.1),
     ui.input_numeric("rmb_moe",     "Tolerierbare MOE für b", value=0.025, min=0.000001, step=0.005),
+    hinweis_panel("reg_mult_b"),
 )
 inputs_reg_mult_beta = ui.div(
     ui.input_numeric("rmbeta_r2",  "Erwartetes R² des Gesamtmodells (0 bis 1)", value=0.9, min=0.0, max=0.999, step=0.05),
     ui.input_numeric("rmbeta_vif", "Variance Inflation Factor (VIF)", value=2.0, min=1.0, step=0.1),
     ui.input_numeric("rmbeta_moe", "Tolerierbare MOE für Beta", value=0.04, min=0.000001, step=0.005),
+    hinweis_panel("reg_mult_beta"),
 )
 inputs_reg_mw = ui.div(
     ui.input_numeric("rmw_sigma_e", "Residual-Streuung sigma_e", value=2.0, min=0.0001, step=0.1),
@@ -119,6 +247,7 @@ inputs_reg_mw = ui.div(
     ui.input_numeric("rmw_var_t",   "Varianz der Zeit-Codierung Var(T)", value=0.25, min=0.0001, step=0.05),
     ui.input_numeric("rmw_var_g",   "Varianz der Gruppen-Codierung Var(G)", value=0.25, min=0.0001, step=0.05),
     ui.input_numeric("rmw_moe",     "Tolerierbare MOE für den Interaktionseffekt", value=1.0, min=0.0001, step=0.1),
+    hinweis_panel("reg_mw"),
 )
 
 app_ui = ui.page_fluid(
@@ -126,7 +255,7 @@ app_ui = ui.page_fluid(
         ui.card_header("Mindeststichproben-Rechner"),
         ui.layout_columns(
             ui.div(
-                ui.input_select("design", "Studiendesign", choices=DESIGNS, selected="mean"),
+                ui.input_select("design", "Studiendesign (gesuchter Parameter)", choices=DESIGNS, selected="mean"),
                 ui.input_numeric("konfidenz", "Konfidenzniveau in % (z. B. 95 oder 99)", value=95.0, min=50.0, max=99.99, step=1.0),
                 ui.hr(),
                 ui.output_ui("design_inputs"),
@@ -189,6 +318,7 @@ def server(input, output, session):
         except Exception as ex:
             return None, 0, {}, 0
 
+    # Label für die primär ausgegebene Größe (Mindest-N)
     EINHEIT = {
         "mean":          "insgesamt",
         "prop":          "insgesamt",
@@ -201,6 +331,19 @@ def server(input, output, session):
         "reg_mw":        "Personen (gesamt)",
     }
 
+    def gesamt_n_info(d, n_int):
+        """Gibt (Label, Wert) der zusätzlichen Zeile zurück, oder None.
+
+        D3: n_int ist pro Gruppe -> Gesamt-N = 2 * n_int.
+        D9: n_int ist Gesamt-N   -> pro Gruppe = ceil(n_int / 2).
+        D4: keine Zusatzzeile (n_int ist bereits Personenzahl gesamt).
+        """
+        if d == "mean_indep":
+            return "Gesamt-N (beide Gruppen)", 2 * n_int
+        if d == "reg_mw":
+            return "pro Gruppe (bei 2 Gruppen)", int(np.ceil(n_int / 2))
+        return None
+
     @render.ui
     def ergebnis_box():
         res = ergebnis()
@@ -208,18 +351,24 @@ def server(input, output, session):
             return ui.div(ui.h5("Eingabe prüfen"))
         n_int, z, _, _ = res
         d = input.design()
-        return ui.div(
+
+        zeilen = [
             ui.h3(ui.strong(f"Mindest-N: {n_int}")),
             ui.p(f"({EINHEIT[d]})"),
-            ui.p(f"z-Wert bei {input.konfidenz():.2f}%-Konfidenz: {z:.4f}"),
-        )
+        ]
+        zusatz = gesamt_n_info(d, n_int)
+        if zusatz is not None:
+            label, wert = zusatz
+            zeilen.append(ui.h4(ui.strong(f"{label}: {wert}")))
+        zeilen.append(ui.p(f"z-Wert bei {input.konfidenz():.2f}%-Konfidenz: {z:.4f}"))
+        return ui.div(*zeilen)
 
     @render.plot
     def formel_plot():
         d = input.design()
         res = ergebnis()
         if res[0] is None:
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(9, 8.5))
             ax.text(0.5, 0.5, "Eingabe prüfen", ha="center", va="center", transform=ax.transAxes)
             ax.set_axis_off()
             return fig
@@ -249,10 +398,23 @@ def server(input, output, session):
         ax_plot.scatter([moe_clip], [n_aktuell], color="#3498db", s=120, zorder=5,
                         label=f"Aktuelle Wahl: MOE = {moe_aktuell:g}, N = {n_int}")
 
-        y_max = min(np.percentile(n_grid, 95) * 1.5, n_grid.max())
-        y_max = max(y_max, n_aktuell * 1.2, 10)
+        # --- Robuste Y-Achse ---
+        # Feste Untergrenze 0; Obergrenze so, dass der aktuelle Punkt IMMER
+        # vollständig sichtbar ist (Priorität Punkt), die Kurve darf oben raus.
+        # Basis ist das 95%-Perzentil der Kurve, damit steile Äste nicht alles
+        # plattdrücken; der Punkt erzwingt aber eine Mindesthöhe inkl. Puffer.
+        kurven_basis = np.percentile(n_grid, 95) * 1.5
+        punkt_bedarf = n_aktuell * 1.2  # 20% Luft über dem Punkt + Legende
+        y_max = max(kurven_basis, punkt_bedarf, 10)
+
+        # Sicherheitsnetz: falls Rundungen den Punkt minimal über die Grenze
+        # schieben, Punkt garantiert einschließen.
+        if y_max <= n_aktuell:
+            y_max = n_aktuell * 1.2
+
         ax_plot.set_xlim(moe_min, moe_max)
         ax_plot.set_ylim(0, y_max)
+        ax_plot.margins(y=0)
         ax_plot.set_xlabel("Margin of Error (MOE)")
         ax_plot.set_ylabel("Mindest-N")
         ax_plot.set_title(f"N in Abhängigkeit der MOE  ({DESIGNS[d]})", fontsize=11)
@@ -261,7 +423,9 @@ def server(input, output, session):
         ax_plot.spines['top'].set_visible(False)
         ax_plot.spines['right'].set_visible(False)
 
-        plt.tight_layout()
+        # Layout sauber einpassen, damit y-Achsenbeschriftung nie abgeschnitten
+        # wird – unabhängig von Fenstergröße/DPI.
+        fig.set_constrained_layout(True)
         return fig
 
 app = App(app_ui, server)

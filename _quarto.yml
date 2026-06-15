@@ -6,13 +6,6 @@ book:
   title: "Bayesianische Intuition"
   subtitle: "Ein interaktiver Workshop zur Inferenzstatistik"
   chapters:
-    - index.qmd
-    - chap1.qmd
-    - chap2.qmd
-    - chap3.qmd
-    - chap4.qmd
-    - chap5.qmd
-    - chap6.qmd
     - chap7.qmd
 
 execute:

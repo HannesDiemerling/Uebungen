@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import pypdf; r = pypdf.PdfReader\\('Kap10 \\(1\\).pdf'\\); print\\('Pages:', len\\(r.pages\\)\\); print\\('Encrypted:', r.is_encrypted\\)\")",
+      "Bash(where python3 *)"
+    ]
+  }
+}
