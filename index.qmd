@@ -19,7 +19,7 @@ Abgedeckte Designs:
 
 ```{shinylive-python}
 #| standalone: true
-#| viewerHeight: 1150
+#| viewerHeight: 1300
 
 from shiny import App, render, ui, reactive
 import numpy as np
@@ -257,7 +257,7 @@ app_ui = ui.page_fluid(
                 ui.output_ui("ergebnis_box"),
             ),
             ui.output_image("formel_plot", width="100%", height="auto", fill=False),
-            col_widths=(5, 7),
+            col_widths=(4, 8),
         ),
     ),
     # Hinweis-Menü wandert unter das App-Fenster und ist dort immer sichtbar,

@@ -9,5 +9,6 @@ format:
   html:
     theme: cosmo
     toc: false
+    page-layout: full
     filters:
       - shinylive
