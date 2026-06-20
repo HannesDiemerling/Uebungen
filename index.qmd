@@ -26,6 +26,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 import textwrap
+import os
+import tempfile
 
 DESIGNS = {
     "mean":         "1. Mittelwert",
@@ -254,7 +256,7 @@ app_ui = ui.page_fluid(
                 ui.hr(),
                 ui.output_ui("ergebnis_box"),
             ),
-            ui.output_plot("formel_plot", height="700px", fill=False),
+            ui.output_image("formel_plot", width="100%", height="auto", fill=False),
             col_widths=(5, 7),
         ),
     ),
@@ -395,7 +397,20 @@ def server(input, output, session):
             ui.div(*[ui.p(t) for t in absaetze]),
         )
 
-    @render.plot
+    def _bild_aus_figur(fig):
+        """Figur als PNG mit bbox_inches='tight' speichern.
+
+        'tight' erweitert die Bildfläche automatisch um ALLE Texte (Titel,
+        Formel, Achsen, Legende), sodass generell nichts mehr abgeschnitten
+        werden kann – unabhängig von der Textlänge. Das Bild wird im UI über
+        die Breite skaliert und dadurch nie verzerrt.
+        """
+        path = os.path.join(tempfile.gettempdir(), "formel_plot.png")
+        fig.savefig(path, dpi=110, bbox_inches="tight", pad_inches=0.2)
+        plt.close(fig)
+        return {"src": path, "width": "100%"}
+
+    @render.image(delete_file=True)
     def formel_plot():
         d = input.design()
         res = ergebnis()
@@ -403,7 +418,7 @@ def server(input, output, session):
             fig, ax = plt.subplots(figsize=(9, 8.5))
             ax.text(0.5, 0.5, "Eingabe prüfen", ha="center", va="center", transform=ax.transAxes)
             ax.set_axis_off()
-            return fig
+            return _bild_aus_figur(fig)
 
         n_int, z, inp, moe_aktuell = res
 
@@ -458,7 +473,7 @@ def server(input, output, session):
         # Layout sauber einpassen, damit y-Achsenbeschriftung nie abgeschnitten
         # wird – unabhängig von Fenstergröße/DPI.
         fig.set_constrained_layout(True)
-        return fig
+        return _bild_aus_figur(fig)
 
 app = App(app_ui, server)
 ```
