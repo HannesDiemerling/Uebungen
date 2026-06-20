@@ -25,6 +25,7 @@ from shiny import App, render, ui, reactive
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
+import textwrap
 
 DESIGNS = {
     "mean":         "1. Mittelwert",
@@ -445,7 +446,10 @@ def server(input, output, session):
         ax_plot.margins(y=0)
         ax_plot.set_xlabel("Margin of Error (MOE)")
         ax_plot.set_ylabel("Mindest-N")
-        ax_plot.set_title(f"N in Abhängigkeit der MOE  ({DESIGNS[d]})", fontsize=11)
+        # Langer Designname (v. a. Design 9) wird umgebrochen, damit der Titel
+        # nicht seitlich aus der Abbildung läuft.
+        titel = "N in Abhängigkeit der MOE\n" + textwrap.fill(DESIGNS[d], width=55)
+        ax_plot.set_title(titel, fontsize=11)
         ax_plot.legend(loc="upper right", fontsize=10)
         ax_plot.grid(alpha=0.3)
         ax_plot.spines['top'].set_visible(False)
