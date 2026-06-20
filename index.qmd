@@ -441,24 +441,33 @@ def server(input, output, session):
         ax_plot.fill_between(moe_grid, 0, n_grid, color="#27ae60", alpha=0.12)
 
         moe_clip = min(max(moe_aktuell, moe_min), moe_max)
-        n_aktuell = n_fuer_design(d, z, inp, moe_clip)
-        n_aktuell = max(1, n_aktuell)
-        ax_plot.axvline(moe_clip, color="#3498db", linestyle="dotted", linewidth=2)
-        ax_plot.scatter([moe_clip], [n_aktuell], color="#3498db", s=120, zorder=5,
-                        label=f"Aktuelle Wahl: MOE = {moe_aktuell:g}, N = {n_int}")
+        n_aktuell = max(1, n_fuer_design(d, z, inp, moe_clip))
 
-        # --- Robuste Y-Achse ---
-        # Feste Untergrenze 0; Obergrenze so, dass der aktuelle Punkt IMMER
-        # vollständig sichtbar ist (Priorität Punkt), die Kurve darf oben raus.
-        kurven_basis = np.percentile(n_grid, 95) * 1.5
-        punkt_bedarf = n_aktuell * 1.2
-        y_max = max(kurven_basis, punkt_bedarf, 10)
-        if y_max <= n_aktuell:
-            y_max = n_aktuell * 1.2
+        # --- Stabile Y-Achse ---
+        # Die Obergrenze richtet sich NUR nach dem Kurvenverlauf über den
+        # MOE-Bereich, nicht nach der aktuell gewählten MOE. Dadurch bleibt der
+        # Rahmen ruhig, während man die MOE variiert – der blaue Punkt wandert
+        # dann auf einer feststehenden Kurve. Erst wenn sich die geschätzten
+        # Parameter (z. B. sigma) ändern und N damit eine andere Größenordnung
+        # bekommt, passt sich die Achse an.
+        y_max = max(np.percentile(n_grid, 95) * 1.3, 10)
 
         ax_plot.set_xlim(moe_min, moe_max)
         ax_plot.set_ylim(0, y_max)
         ax_plot.margins(y=0)
+
+        ax_plot.axvline(moe_clip, color="#3498db", linestyle="dotted", linewidth=2)
+
+        # Punkt einzeichnen. Liegt N (bei sehr kleiner MOE) über dem sichtbaren
+        # Bereich, wird es als Dreieck am oberen Rand markiert; der genaue Wert
+        # steht weiterhin in der Legende.
+        if n_aktuell <= y_max:
+            ax_plot.scatter([moe_clip], [n_aktuell], color="#3498db", s=120, zorder=5,
+                            label=f"Aktuelle Wahl: MOE = {moe_aktuell:g}, N = {n_int}")
+        else:
+            ax_plot.scatter([moe_clip], [y_max], color="#3498db", s=150, marker="^",
+                            zorder=5, clip_on=False,
+                            label=f"Aktuelle Wahl: MOE = {moe_aktuell:g}, N = {n_int} (über Skala)")
         ax_plot.set_xlabel("Margin of Error (MOE)")
         ax_plot.set_ylabel("Mindest-N")
         # Langer Designname (v. a. Design 9) wird umgebrochen, damit der Titel
