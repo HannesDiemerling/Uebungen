@@ -13,9 +13,12 @@ Abgedeckte Designs:
 4. Mittelwertsunterschied (abhängige Messungen)
 5. Korrelationskoeffizient
 6. Regressionskoeffizient (einfache Regression, unstandardisiert)
-7. Regressionskoeffizient (multiple Regression, unstandardisiert)
-8. Regressionskoeffizient (multiple Regression, standardisiert)
-9. Interaktionseffekt (multiple Regression mit Messwiederholung)
+7. Regressionskoeffizient (einfache Regression, standardisiert)
+8. Regressionskoeffizient (multiple Regression, unstandardisiert)
+9. Regressionskoeffizient (multiple Regression, standardisiert)
+10. Interaktionseffekt (multiple Regression mit Messwiederholung)
+11. Interaktionseffekt im Mehrebenenmodell (unstandardisiert)
+12. Interaktionseffekt im Mehrebenenmodell (standardisiert)
 
 ```{shinylive-python}
 #| standalone: true
@@ -30,27 +33,33 @@ import os
 import tempfile
 
 DESIGNS = {
-    "mean":         "1. Mittelwert",
-    "prop":         "2. Anteil",
-    "mean_indep":   "3. Mittelwertsunterschied (unabhängige Messungen)",
-    "mean_dep":     "4. Mittelwertsunterschied (abhängige Messungen)",
-    "corr":         "5. Korrelationskoeffizient",
-    "reg_simple":   "6. Regressionskoeffizient (einfache Regression, unstandardisiert)",
-    "reg_mult_b":   "7. Regressionskoeffizient (multiple Regression, unstandardisiert)",
-    "reg_mult_beta":"8. Regressionskoeffizient (multiple Regression, standardisiert)",
-    "reg_mw":       "9. Interaktionseffekt (multiple Regression mit Messwiederholung)",
+    "mean":            "1. Mittelwert",
+    "prop":            "2. Anteil",
+    "mean_indep":      "3. Mittelwertsunterschied (unabhängige Messungen)",
+    "mean_dep":        "4. Mittelwertsunterschied (abhängige Messungen)",
+    "corr":            "5. Korrelationskoeffizient",
+    "reg_simple":      "6. Regressionskoeffizient (einfache Regression, unstandardisiert)",
+    "reg_simple_beta": "7. Regressionskoeffizient (einfache Regression, standardisiert)",
+    "reg_mult_b":      "8. Regressionskoeffizient (multiple Regression, unstandardisiert)",
+    "reg_mult_beta":   "9. Regressionskoeffizient (multiple Regression, standardisiert)",
+    "reg_mw":          "10. Interaktionseffekt (multiple Regression mit Messwiederholung)",
+    "ml_b":            "11. Interaktionseffekt im Mehrebenenmodell (unstandardisiert)",
+    "ml_beta":         "12. Interaktionseffekt im Mehrebenenmodell (standardisiert)",
 }
 
 FORMELN = {
     "mean":          r"$N = \left(\dfrac{z \cdot \sigma}{\mathrm{MOE}}\right)^{2}$",
     "prop":          r"$N = \dfrac{z^{2} \cdot p\,(1-p)}{\mathrm{MOE}^{2}}$",
-    "mean_indep":    r"$N = 2 \cdot \left(\dfrac{z \cdot \sigma}{\mathrm{MOE}}\right)^{2}\ \ \mathrm{pro\ Gruppe}$",
+    "mean_indep":    r"$N = 2 \cdot \left(\dfrac{z \cdot \sigma}{\mathrm{MOE}}\right)^{2}$" + "\n(pro Gruppe)",
     "mean_dep":      r"$N = \left(\dfrac{z \cdot \sigma_{\mathrm{diff}}}{\mathrm{MOE}}\right)^{2}$",
     "corr":          r"$N = 3 + \left(\dfrac{z \cdot (1 - r^{2})}{\mathrm{MOE}}\right)^{2}$",
     "reg_simple":    r"$N = 1 + \dfrac{z^{2} \cdot \sigma_{e}^{2}}{\mathrm{MOE}^{2} \cdot \mathrm{Var}(x)}$",
     "reg_mult_b":    r"$N = 1 + \dfrac{z^{2} \cdot \sigma_{e}^{2} \cdot \mathrm{VIF}}{\mathrm{MOE}^{2} \cdot \mathrm{Var}(x)}$",
     "reg_mult_beta": r"$N = 1 + \dfrac{z^{2} \cdot (1 - R^{2}) \cdot \mathrm{VIF}}{\mathrm{MOE}^{2}}$",
     "reg_mw":        r"$N = \dfrac{z^{2} \cdot \sigma_{e}^{2} \cdot [1 + (m-1)\,\mathrm{ICC}]}{m \cdot \mathrm{MOE}^{2} \cdot \mathrm{Var}(T) \cdot \mathrm{Var}(G)}$",
+    "reg_simple_beta": r"$N = 3 + \left(\dfrac{z \cdot (1 - \beta^{2})}{\mathrm{MOE}}\right)^{2}$",
+    "ml_b":          r"$N_{\mathrm{Ebene\,2}} = \dfrac{z^{2} \cdot \sigma_{e}^{2} \cdot [1 + (m-1)\,\mathrm{ICC}]}{m \cdot \mathrm{MOE}^{2} \cdot \mathrm{Var}(P_{1}) \cdot \mathrm{Var}(P_{2})}$",
+    "ml_beta":       r"$N_{\mathrm{Ebene\,2}} = \dfrac{z^{2} \cdot \sigma_{e}^{2} \cdot [1 + (m-1)\,\mathrm{ICC}]}{m \cdot \mathrm{MOE}^{2}}$",
 }
 
 MOE_RANGE = {
@@ -63,6 +72,9 @@ MOE_RANGE = {
     "reg_mult_b":    (0.005, 0.2),
     "reg_mult_beta": (0.005, 0.2),
     "reg_mw":        (0.1,   5.0),
+    "reg_simple_beta": (0.01, 0.5),
+    "ml_b":          (0.1,   5.0),
+    "ml_beta":       (0.05,  1.0),
 }
 
 HINWEISE = {
@@ -144,33 +156,110 @@ HINWEISE = {
         "kann er auch deutlich höher liegen (etwa bei 5).",
     "reg_mw":
         "Für die Berechnung der Mindeststichprobengröße für einen unstandardisierten "
-        "Interaktionseffekt in der Multiplen Regression (klassischer Effekt einer "
-        "2x2-Interventionsstudie) musst du vorab die Anzahl der Messungen pro Person "
-        "eintragen (bei einer 2x2-Studie also 2), die Residualvarianz und den ICC grob "
-        "schätzen (auf Grundlage der Literatur, eigener Vorstudien, oder von "
-        "Plausibilitätsüberlegungen) sowie die Varianz der Zeit- und der Gruppencodierung "
-        "ermitteln.\n\n"
+        "Interaktionseffekt in einem klassischen 2x2-prä-post-Interventionsdesign musst du "
+        "vorab die Anzahl der Messungen pro Person eintragen (bei einer 2x2-Studie also 2), "
+        "die Residualvarianz und den ICC grob schätzen (auf Grundlage der Literatur, "
+        "eigener Vorstudien, oder von Plausibilitätsüberlegungen) sowie die Varianz der "
+        "Zeit- und der Gruppencodierung ermitteln.\n\n"
         "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
         "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
-        "näherungsweise durch die Gesamtstreuung des Kriteriums zu ersetzen, also dessen "
-        "vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
-        "vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
+        "näherungsweise durch die Gesamtvarianz des Kriteriums zu ersetzen. (Man nimmt "
+        "damit vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
         "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
         "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
         "Planung der Mindeststichprobengröße gut geeignet.)\n\n"
-        "Der ICC entspricht der Korrelation der wiederholten Messungen innerhalb der "
-        "Personen. Er ist aus vorauslaufenden Studien typischerweise grob bekannt. Typische "
-        "Werte liegen zwischen .3 und .7. Hat man keinen Anhaltspunkt, kann man .5 als "
-        "Schätzung verwenden.\n\n"
+        "Der ICC beschreibt die Korrelation der wiederholten Messungen innerhalb derselben "
+        "Person und entspricht dem Anteil stabiler interindividueller Unterschiede an der "
+        "Gesamtvarianz. Er ist aus vorauslaufenden Studien typischerweise grob bekannt. "
+        "Typische Werte liegen zwischen .3 und .7.\n\n"
         "Die Varianzen der beiden Prädiktoren Zeit (Var(T)) und Gruppe (Var(G)) müssen "
         "nicht geschätzt werden, sondern hängen direkt von der verwendeten Dummy-Codierung "
         "ab. Typisch ist eine Codierung mit Kontrollgruppe = 0 und Therapiegruppe = 1 sowie "
         "pre-Messung = 0 und post-Messung = 1. Die Varianz der beiden Werte 0 und 1 beträgt "
-        "0,25. Somit betragen die beiden Varianzen 0,25. Hast du eine andere Codierung "
-        "verwendet, musst du die Varianz entsprechend zunächst berechnen.\n\n"
-        "Die Formel gilt für experimentelle Designs mit etwa gleich großen Gruppen. Sie "
-        "gibt das Gesamt-N aus, das auf die Gruppen verteilt wird. Beträgt es z. B. 200, "
-        "werden bei zwei Gruppen je 100 Personen benötigt.",
+        "0,25. Somit betragen die beiden Varianzen 0,25 (gegeben dass die beiden Gruppen in "
+        "etwa gleich groß sind). Hast du eine andere Codierung verwendet, musst du die "
+        "Varianz entsprechend zunächst berechnen.\n\n"
+        "Die Formel gibt das Gesamt-N aus, das auf die Gruppen verteilt wird. Beträgt es "
+        "z. B. 200, werden bei zwei Gruppen je 100 Personen benötigt.",
+    "reg_simple_beta":
+        "Für die Berechnung der Mindeststichprobengröße für einen standardisierten "
+        "Regressionskoeffizienten in der einfachen linearen Regression musst du dessen "
+        "Größe (β) in der Population vorher grob schätzen (auf Grundlage der Literatur, "
+        "eigener Vorstudien, oder von Plausibilitätsüberlegungen).\n\n"
+        "In der einfachen Regression entspricht der standardisierte Regressionskoeffizient "
+        "β der Korrelation r zwischen Prädiktor und Kriterium. Die Berechnung ist daher "
+        "identisch zu der für den Korrelationskoeffizienten.",
+    "ml_b":
+        "Die Planung der Mindeststichprobengröße bezieht sich in der Regel auf den "
+        "Cross-Level-Interaktionseffekt, weil der am schwierigsten zu entdecken ist. Die "
+        "Planung bezieht sich auf die Anzahl der Ebene-2-Einheiten (also die Anzahl der "
+        "Cluster bzw. Gruppen in einem Gruppendesign oder die Anzahl von Personen in einem "
+        "Messwiederholungsdesign), weil die Sensitivität deutlich stärker hiervon abhängt "
+        "als von der Anzahl der Ebene-1-Einheiten.\n\n"
+        "Für die Berechnung der Mindeststichprobengröße musst du vorab die Anzahl der "
+        "Ebene-1-Einheiten eintragen, die Residualvarianz und den ICC grob schätzen (auf "
+        "Grundlage der Literatur, eigener Vorstudien, oder von Plausibilitätsüberlegungen) "
+        "sowie die Varianz der Prädiktoren auf Ebene 1 und 2 ermitteln. m ist die Anzahl "
+        "der Einheiten auf Ebene 1, also die Anzahl von Personen pro Gruppe in einem "
+        "Gruppendesign oder die Anzahl von Messungen pro Person in einem "
+        "Messwiederholungsdesign.\n\n"
+        "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
+        "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
+        "näherungsweise durch die Gesamtvarianz des Kriteriums zu ersetzen. (Man nimmt "
+        "damit vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
+        "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
+        "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
+        "Planung der Mindeststichprobengröße gut geeignet.)\n\n"
+        "Der ICC ist der Anteil der Varianz auf Ebene 2 an der Gesamtvarianz, also die "
+        "Ähnlichkeit von Personen innerhalb derselben Gruppe oder die Ähnlichkeit von "
+        "Messungen innerhalb derselben Person. Er ist aus vorauslaufenden Studien "
+        "typischerweise grob bekannt. Bei Gruppendesigns, in denen Personen auf Ebene 1 in "
+        "Gruppen auf Ebene 2 geschachtelt sind, liegt der ICC häufig im Bereich von etwa "
+        ".05 bis .15, da der größte Teil der Varianz typischerweise zwischen Individuen "
+        "innerhalb der Gruppen liegt. Bei Messwiederholungsdesigns, in denen Messungen auf "
+        "Ebene 1 in Personen auf Ebene 2 geschachtelt sind, ist der ICC hingegen oft "
+        "deutlich höher (z. B. 0.30 bis 0.60), da interindividuelle Unterschiede meist "
+        "einen großen Teil der Gesamtvarianz ausmachen.\n\n"
+        "Die Varianzen der beiden Prädiktoren auf Ebene 1 und 2 müssen bei faktoriellen "
+        "Designs nicht geschätzt werden, sondern ergeben sich aus der verwendeten "
+        "Dummy-Codierung. Typisch ist eine Codierung von zwei Gruppen bzw. zwei "
+        "Messzeitpunkten mit 0 und 1. Die Varianz der beiden Werte 0 und 1 beträgt 0,25. "
+        "Somit betragen die beiden Varianzen in einem 2x2-Design 0,25. Hast du eine andere "
+        "Codierung verwendet, musst du die Varianz entsprechend zunächst berechnen. "
+        "Alternativ hast du bei Mehrebenenmodellen kontinuierliche Prädiktoren vorliegen, "
+        "sodass du deren Varianz vor der Studie grob schätzen musst.",
+    "ml_beta":
+        "Die Planung der Mindeststichprobengröße bezieht sich in der Regel auf den "
+        "Cross-Level-Interaktionseffekt, weil der am schwierigsten zu entdecken ist. Die "
+        "Planung bezieht sich auf die Anzahl der Ebene-2-Einheiten (also die Anzahl der "
+        "Cluster bzw. Gruppen in einem Gruppendesign oder die Anzahl von Personen in einem "
+        "Messwiederholungsdesign), weil die Sensitivität deutlich stärker hiervon abhängt "
+        "als von der Anzahl der Ebene-1-Einheiten. Die Formel geht von etwa gleich großen "
+        "Clustern (bzw. gleich vielen Messungen pro Person) aus.\n\n"
+        "Für die Berechnung der Mindeststichprobengröße musst du vorab die Anzahl der "
+        "Ebene-1-Einheiten eintragen, die Residualvarianz und den ICC grob schätzen (auf "
+        "Grundlage der Literatur, eigener Vorstudien, oder von Plausibilitätsüberlegungen). "
+        "m ist die Anzahl der Einheiten auf Ebene 1, also die Anzahl von Personen pro "
+        "Gruppe in einem Gruppendesign oder die Anzahl von Messungen pro Person in einem "
+        "Messwiederholungsdesign.\n\n"
+        "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
+        "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
+        "näherungsweise durch die Gesamtvarianz des Kriteriums zu ersetzen. Wenn du völlig "
+        "im Dunkeln tappst, kannst du die Varianz konservativ auf 1 setzen. (Man nimmt "
+        "damit vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
+        "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
+        "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
+        "Planung der Mindeststichprobengröße gut geeignet.)\n\n"
+        "Der ICC ist der Anteil der Varianz auf Ebene 2 an der Gesamtvarianz, also die "
+        "Ähnlichkeit von Personen innerhalb derselben Gruppe oder die Ähnlichkeit von "
+        "Messungen innerhalb derselben Person. Er ist aus vorauslaufenden Studien "
+        "typischerweise grob bekannt. Bei Gruppendesigns, in denen Personen auf Ebene 1 in "
+        "Gruppen auf Ebene 2 geschachtelt sind, liegt der ICC häufig im Bereich von etwa "
+        ".05 bis .15, da der größte Teil der Varianz typischerweise zwischen Individuen "
+        "innerhalb der Gruppen liegt. Bei Messwiederholungsdesigns, in denen Messungen auf "
+        "Ebene 1 in Personen auf Ebene 2 geschachtelt sind, ist der ICC hingegen oft "
+        "deutlich höher (z. B. 0.30 bis 0.60), da interindividuelle Unterschiede meist "
+        "einen großen Teil der Gesamtvarianz ausmachen.",
 }
 
 def z_wert(konfidenz):
@@ -185,19 +274,25 @@ def n_corr(z, r, moe):                           return 3 + (z * (1 - r ** 2) / 
 def n_reg_simple(z, sigma_e, moe, var_x):        return 1 + (z ** 2) * (sigma_e ** 2) / ((moe ** 2) * var_x)
 def n_reg_mult_b(z, sigma_e, moe, var_x, vif):   return 1 + (z ** 2) * (sigma_e ** 2) * vif / ((moe ** 2) * var_x)
 def n_reg_mult_beta(z, r2, vif, moe):            return 1 + (z ** 2) * (1 - r2) * vif / (moe ** 2)
+def n_reg_simple_beta(z, beta, moe):             return 3 + (z * (1 - beta ** 2) / moe) ** 2
 def n_reg_mw(z, sigma_e, m, icc, moe, var_t, var_g):
     return ((z ** 2) * (sigma_e ** 2) * (1 + (m - 1) * icc)) / (m * (moe ** 2) * var_t * var_g)
+def n_ml_beta(z, sigma_e, m, icc, moe):
+    return ((z ** 2) * (sigma_e ** 2) * (1 + (m - 1) * icc)) / (m * (moe ** 2))
 
 def n_fuer_design(d, z, inp, moe):
-    if d == "mean":          return n_mean(z, inp["sigma"], moe)
-    if d == "prop":          return n_prop(z, inp["p"], moe)
-    if d == "mean_indep":    return n_mean_indep(z, inp["sigma"], moe)
-    if d == "mean_dep":      return n_mean_dep(z, inp["sigma_diff"], moe)
-    if d == "corr":          return n_corr(z, inp["r"], moe)
-    if d == "reg_simple":    return n_reg_simple(z, inp["sigma_e"], moe, inp["var_x"])
-    if d == "reg_mult_b":    return n_reg_mult_b(z, inp["sigma_e"], moe, inp["var_x"], inp["vif"])
-    if d == "reg_mult_beta": return n_reg_mult_beta(z, inp["r2"], inp["vif"], moe)
-    if d == "reg_mw":        return n_reg_mw(z, inp["sigma_e"], inp["m"], inp["icc"], moe, inp["var_t"], inp["var_g"])
+    if d == "mean":            return n_mean(z, inp["sigma"], moe)
+    if d == "prop":            return n_prop(z, inp["p"], moe)
+    if d == "mean_indep":      return n_mean_indep(z, inp["sigma"], moe)
+    if d == "mean_dep":        return n_mean_dep(z, inp["sigma_diff"], moe)
+    if d == "corr":            return n_corr(z, inp["r"], moe)
+    if d == "reg_simple":      return n_reg_simple(z, inp["sigma_e"], moe, inp["var_x"])
+    if d == "reg_simple_beta": return n_reg_simple_beta(z, inp["beta"], moe)
+    if d == "reg_mult_b":      return n_reg_mult_b(z, inp["sigma_e"], moe, inp["var_x"], inp["vif"])
+    if d == "reg_mult_beta":   return n_reg_mult_beta(z, inp["r2"], inp["vif"], moe)
+    if d == "reg_mw":          return n_reg_mw(z, inp["sigma_e"], inp["m"], inp["icc"], moe, inp["var_t"], inp["var_g"])
+    if d == "ml_b":            return n_reg_mw(z, inp["sigma_e"], inp["m"], inp["icc"], moe, inp["var_p1"], inp["var_p2"])
+    if d == "ml_beta":         return n_ml_beta(z, inp["sigma_e"], inp["m"], inp["icc"], moe)
 
 inputs_mean = ui.div(
     ui.input_numeric("mean_sigma", "Geschätzte Standardabweichung sigma in der Population", value=10.0, min=0.0001, step=0.1),
@@ -224,6 +319,10 @@ inputs_reg_simple = ui.div(
     ui.input_numeric("rs_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
     ui.input_numeric("rs_moe",     "Tolerierbare MOE für b", value=0.025, min=0.000001, step=0.005),
 )
+inputs_reg_simple_beta = ui.div(
+    ui.input_numeric("rsb_beta", "Vermuteter standardisierter Koeffizient β (-1 bis 1)", value=0.3, min=-0.99, max=0.99, step=0.05),
+    ui.input_numeric("rsb_moe",  "Tolerierbare MOE für β", value=0.1, min=0.0001, step=0.01),
+)
 inputs_reg_mult_b = ui.div(
     ui.input_numeric("rmb_sigma_e", "Residualvarianz sigma_e", value=2.0,  min=0.0001, step=0.1),
     ui.input_numeric("rmb_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
@@ -243,8 +342,28 @@ inputs_reg_mw = ui.div(
     ui.input_numeric("rmw_var_g",   "Varianz der Gruppen-Codierung Var(G)", value=0.25, min=0.0001, step=0.05),
     ui.input_numeric("rmw_moe",     "Tolerierbare MOE für den Interaktionseffekt", value=1.0, min=0.0001, step=0.1),
 )
+inputs_ml_b = ui.div(
+    ui.input_numeric("mlb_sigma_e", "Residualvarianz sigma_e", value=2.0, min=0.0001, step=0.1),
+    ui.input_numeric("mlb_m",       "Anzahl Ebene-1-Einheiten pro Ebene-2-Einheit m", value=2, min=2, step=1),
+    ui.input_numeric("mlb_icc",     "Intraklassenkorrelation ICC (0 bis 1)", value=0.1, min=0.0, max=0.999, step=0.05),
+    ui.input_numeric("mlb_var_p1",  "Varianz des Prädiktors auf Ebene 1 Var(P1)", value=0.25, min=0.0001, step=0.05),
+    ui.input_numeric("mlb_var_p2",  "Varianz des Prädiktors auf Ebene 2 Var(P2)", value=0.25, min=0.0001, step=0.05),
+    ui.input_numeric("mlb_moe",     "Tolerierbare MOE für den Interaktionseffekt", value=1.0, min=0.0001, step=0.1),
+)
+inputs_ml_beta = ui.div(
+    ui.input_numeric("mlbeta_sigma_e", "Residualvarianz sigma_e (Standard: 1)", value=1.0, min=0.0001, step=0.1),
+    ui.input_numeric("mlbeta_m",       "Anzahl Ebene-1-Einheiten pro Ebene-2-Einheit m", value=2, min=2, step=1),
+    ui.input_numeric("mlbeta_icc",     "Intraklassenkorrelation ICC (0 bis 1)", value=0.1, min=0.0, max=0.999, step=0.05),
+    ui.input_numeric("mlbeta_moe",     "Tolerierbare MOE für den standardisierten Interaktionseffekt", value=0.2, min=0.0001, step=0.01),
+)
 
 app_ui = ui.page_fluid(
+    # Höhe der Abbildung deckeln (verzerrungsfrei): Seitenverhältnis bleibt
+    # erhalten, das Bild wird nie höher als 600px und läuft horizontal nicht über.
+    ui.tags.style(
+        "#formel_plot img { max-width:100%; max-height:600px; "
+        "width:auto; height:auto; display:block; margin:0 auto; }"
+    ),
     ui.card(
         ui.card_header("Mindeststichproben-Rechner"),
         ui.layout_columns(
@@ -270,15 +389,18 @@ def server(input, output, session):
     @render.ui
     def design_inputs():
         d = input.design()
-        if d == "mean":          return inputs_mean
-        if d == "prop":          return inputs_prop
-        if d == "mean_indep":    return inputs_mean_indep
-        if d == "mean_dep":      return inputs_mean_dep
-        if d == "corr":          return inputs_corr
-        if d == "reg_simple":    return inputs_reg_simple
-        if d == "reg_mult_b":    return inputs_reg_mult_b
-        if d == "reg_mult_beta": return inputs_reg_mult_beta
-        if d == "reg_mw":        return inputs_reg_mw
+        if d == "mean":            return inputs_mean
+        if d == "prop":            return inputs_prop
+        if d == "mean_indep":      return inputs_mean_indep
+        if d == "mean_dep":        return inputs_mean_dep
+        if d == "corr":            return inputs_corr
+        if d == "reg_simple":      return inputs_reg_simple
+        if d == "reg_simple_beta": return inputs_reg_simple_beta
+        if d == "reg_mult_b":      return inputs_reg_mult_b
+        if d == "reg_mult_beta":   return inputs_reg_mult_beta
+        if d == "reg_mw":          return inputs_reg_mw
+        if d == "ml_b":            return inputs_ml_b
+        if d == "ml_beta":         return inputs_ml_beta
 
     @reactive.Calc
     def aktuelle_eingaben():
@@ -295,6 +417,8 @@ def server(input, output, session):
             return {"r": input.corr_r()}, input.corr_moe()
         if d == "reg_simple":
             return {"sigma_e": input.rs_sigma_e(), "var_x": input.rs_var_x()}, input.rs_moe()
+        if d == "reg_simple_beta":
+            return {"beta": input.rsb_beta()}, input.rsb_moe()
         if d == "reg_mult_b":
             return {"sigma_e": input.rmb_sigma_e(), "var_x": input.rmb_var_x(), "vif": input.rmb_vif()}, input.rmb_moe()
         if d == "reg_mult_beta":
@@ -302,6 +426,12 @@ def server(input, output, session):
         if d == "reg_mw":
             return ({"sigma_e": input.rmw_sigma_e(), "m": input.rmw_m(), "icc": input.rmw_icc(),
                      "var_t": input.rmw_var_t(), "var_g": input.rmw_var_g()}, input.rmw_moe())
+        if d == "ml_b":
+            return ({"sigma_e": input.mlb_sigma_e(), "m": input.mlb_m(), "icc": input.mlb_icc(),
+                     "var_p1": input.mlb_var_p1(), "var_p2": input.mlb_var_p2()}, input.mlb_moe())
+        if d == "ml_beta":
+            return ({"sigma_e": input.mlbeta_sigma_e(), "m": input.mlbeta_m(),
+                     "icc": input.mlbeta_icc()}, input.mlbeta_moe())
 
     @reactive.Calc
     def ergebnis():
@@ -317,28 +447,34 @@ def server(input, output, session):
 
     # Kurze, sinnvolle Einheit der Hauptzahl (Mindest-N) je Design.
     EINHEIT = {
-        "mean":          "Personen insgesamt",
-        "prop":          "Personen insgesamt",
-        "mean_indep":    "Personen pro Gruppe",
-        "mean_dep":      "Personen insgesamt",
-        "corr":          "Personen insgesamt",
-        "reg_simple":    "Personen insgesamt",
-        "reg_mult_b":    "Personen insgesamt",
-        "reg_mult_beta": "Personen insgesamt",
-        "reg_mw":        "Personen insgesamt",
+        "mean":            "Personen insgesamt",
+        "prop":            "Personen insgesamt",
+        "mean_indep":      "Personen pro Gruppe",
+        "mean_dep":        "Personen insgesamt",
+        "corr":            "Personen insgesamt",
+        "reg_simple":      "Personen insgesamt",
+        "reg_simple_beta": "Personen insgesamt",
+        "reg_mult_b":      "Personen insgesamt",
+        "reg_mult_beta":   "Personen insgesamt",
+        "reg_mw":          "Personen insgesamt",
+        "ml_b":            "Ebene-2-Einheiten (Cluster bzw. Personen)",
+        "ml_beta":         "Ebene-2-Einheiten (Cluster bzw. Personen)",
     }
 
-    def zusatz_info(d, n_int):
+    def zusatz_info(d, n_int, inp):
         """Zusatzzeile nur dort, wo sie inhaltlich Sinn ergibt.
 
-        D3 (mean_indep): Hauptzahl ist pro Gruppe -> Gesamt = 2 * n.
-        D9 (reg_mw):      Hauptzahl ist Gesamt-N  -> pro Gruppe = ceil(n / 2).
+        mean_indep: Hauptzahl ist pro Gruppe   -> Gesamt = 2 * n.
+        reg_mw:     Hauptzahl ist Gesamt-N      -> pro Gruppe = ceil(n / 2).
+        ml_b/ml_beta: Hauptzahl ist Anzahl Ebene-2-Einheiten -> Ebene-1 gesamt = m * n.
         Alle anderen Designs: keine Zusatzzeile.
         """
         if d == "mean_indep":
             return "Gesamt (beide Gruppen)", 2 * n_int
         if d == "reg_mw":
             return "pro Gruppe (bei 2 Gruppen)", int(np.ceil(n_int / 2))
+        if d in ("ml_b", "ml_beta"):
+            return "Ebene-1-Einheiten insgesamt (m · N)", int(inp["m"]) * n_int
         return None
 
     # Einheitliche Stildefinitionen, damit Schriftgrößen/-gewichte nicht
@@ -357,7 +493,7 @@ def server(input, output, session):
                 ui.p("Eingabe prüfen", style="margin:0; font-size:1.2rem; font-weight:600;"),
             )
 
-        n_int, z, _, _ = res
+        n_int, z, inp, _ = res
         d = input.design()
 
         bloecke = [
@@ -368,7 +504,7 @@ def server(input, output, session):
             )
         ]
 
-        zusatz = zusatz_info(d, n_int)
+        zusatz = zusatz_info(d, n_int, inp)
         if zusatz is not None:
             label, wert = zusatz
             bloecke.append(
@@ -406,9 +542,9 @@ def server(input, output, session):
         die Breite skaliert und dadurch nie verzerrt.
         """
         path = os.path.join(tempfile.gettempdir(), "formel_plot.png")
-        fig.savefig(path, dpi=110, bbox_inches="tight", pad_inches=0.2)
+        fig.savefig(path, dpi=110, bbox_inches="tight", pad_inches=0.3)
         plt.close(fig)
-        return {"src": path, "width": "100%"}
+        return {"src": path}
 
     @render.image(delete_file=True)
     def formel_plot():
@@ -428,7 +564,7 @@ def server(input, output, session):
 
         # Kleinere Schrift, damit auch die lange Formel (Design 9) horizontal
         # vollständig in die Abbildung passt und nicht seitlich abgeschnitten wird.
-        ax_form.text(0.5, 0.5, FORMELN[d], ha="center", va="center", fontsize=15, transform=ax_form.transAxes)
+        ax_form.text(0.5, 0.5, FORMELN[d], ha="center", va="center", fontsize=14, transform=ax_form.transAxes)
         ax_form.set_axis_off()
         ax_form.set_title("Verwendete Formel", fontsize=12, loc="left")
 
@@ -489,4 +625,16 @@ app = App(app_ui, server)
 
 ---
 
+## Über diesen Rechner {.unnumbered}
+
+**Autoren:** Hannes Diemerling (HMU Erfurt) und Thomas Schäfer (Professor, HMU Erfurt).
+
+**Software:** Made with ❤️, Python, Shiny & Quarto.
+
 **Lehrbuch:** Schäfer, T. (2026). *Forschungsmethoden, Datenanalyse und Statistik.* Springer.
+
+**Verwandtes Projekt:** [Frequent Reformation – das p-Werte-Projekt](https://hannesdiemerling.github.io/Frequent-Reformation/) — bessere Antworten als „signifikant oder nicht": Effektgrößen, repräsentative Stichproben und bayesianische Inferenz, verständlich erklärt und direkt im Browser zum Mitmachen.
+
+**Diesen Rechner zitieren (APA):**
+
+> Diemerling, H., & Schäfer, T. (Jahr des Abrufs). *Stichprobenrechner* [Statistische Software]. https://www.stichprobenrechner.de
