@@ -627,7 +627,7 @@ app = App(app_ui, server)
 
 ## Über diesen Rechner {.unnumbered}
 
-**Autoren:** Hannes Diemerling (HMU Erfurt) und Thomas Schäfer (Professor, HMU Erfurt).
+**Autoren:** Hannes Diemerling (HMU Erfurt) und Thomas Schäfer (HMU Erfurt).
 
 **Software:** Made with ❤️, Python, Shiny & Quarto.
 
