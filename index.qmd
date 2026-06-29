@@ -11,7 +11,7 @@ header#title-block-header { display: none; }
 </style>
 ```
 
-![](logo.png){fig-alt="Stichprobenrechner" style="display:block; margin:0 auto 1.5rem auto; max-width:100%; width:600px; height:auto;"}
+![](logo.png){fig-alt="Stichprobenrechner" style="display:block; margin:0 0 1.5rem 0; max-width:100%; width:600px; height:auto;"}
 
 Dieses interaktive Tool berechnet die Mindeststichprobengröße für verschiedene Studiendesigns auf Basis der tolerierbaren Margin of Error (MOE) eines Konfidenzintervalls. Konfidenzniveau, die vorher zu schätzenden Designparameter und die tolerierbare MOE sind frei wählbar; das Tool gibt das nötige $N$ zurück und visualisiert den Verlauf $N(\text{MOE})$.
 
