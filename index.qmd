@@ -388,10 +388,11 @@ app_ui = ui.page_fluid(
             ui.output_image("formel_plot", width="100%", height="auto", fill=False),
             col_widths=(4, 8),
         ),
+        # Hinweis steht innerhalb derselben Karte, getrennt durch eine Linie –
+        # so entsteht kein zweites "Fenster im Fenster".
+        ui.hr(),
+        ui.output_ui("hinweis_box"),
     ),
-    # Hinweis-Menü wandert unter das App-Fenster und ist dort immer sichtbar,
-    # damit es die Höhe der Abbildung nicht mehr beeinflusst.
-    ui.output_ui("hinweis_box"),
 )
 
 def server(input, output, session):
@@ -535,11 +536,11 @@ def server(input, output, session):
 
     @render.ui
     def hinweis_box():
-        """Designspezifischer Hinweis, dauerhaft sichtbar unter dem App-Fenster."""
+        """Designspezifischer Hinweis, innerhalb der Hauptkarte unter der Abbildung."""
         d = input.design()
         absaetze = HINWEISE[d].split("\n\n")
-        return ui.card(
-            ui.card_header("Hinweis: Was muss ich vorher schätzen?"),
+        return ui.div(
+            ui.h5("Hinweis: Was muss ich vorher schätzen?"),
             ui.div(*[ui.p(t) for t in absaetze]),
         )
 
