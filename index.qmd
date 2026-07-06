@@ -661,4 +661,4 @@ app = App(app_ui, server)
 
 **Diesen Rechner zitieren (APA):**
 
-> Diemerling, H., & Schäfer, T. (Jahr des Abrufs). *Stichprobenrechner* [Statistische Software]. https://www.stichprobenrechner.de
+> Diemerling, H., & Schäfer, T. (Jahr des Abrufs). *Stichprobenrechner* [Statistische Software]. https://www.stichprobenrechner.app
