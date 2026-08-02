@@ -143,8 +143,8 @@ HINWEISE = {
         "Literatur, eigener Vorstudien, oder von Plausibilitätsüberlegungen).\n\n"
         "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
         "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
-        "näherungsweise durch die Gesamtstreuung des Kriteriums zu ersetzen, also dessen "
-        "vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
+        "näherungsweise durch die Varianz des Kriteriums selbst zu ersetzen, also dessen "
+        "quadrierte vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
         "vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
         "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
         "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
@@ -157,8 +157,8 @@ HINWEISE = {
         "Plausibilitätsüberlegungen).\n\n"
         "Ist die Residualvarianz gänzlich unbekannt, ist es sinnvoll, eine konservative "
         "Schätzung zu verwenden. Eine einfache Annahme besteht darin, die Residualvarianz "
-        "näherungsweise durch die Gesamtstreuung des Kriteriums zu ersetzen, also dessen "
-        "vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
+        "näherungsweise durch die Varianz des Kriteriums selbst zu ersetzen, also dessen "
+        "quadrierte vermutete Standardabweichung als Ausgangspunkt zu verwenden. (Man nimmt damit "
         "vorsichtigerweise an, dass der Prädiktor gar keine Erklärungskraft für das "
         "Kriterium besitzt. Diese Vorgehensweise führt eher zu einer Überschätzung als zu "
         "einer Unterschätzung der erforderlichen Stichprobengröße und ist daher für die "
@@ -295,14 +295,14 @@ def n_prop(z, p, moe):                           return (z ** 2) * p * (1 - p) /
 def n_mean_indep(z, sigma, moe):                 return 2 * (z * sigma / moe) ** 2
 def n_mean_dep(z, sigma_diff, moe):              return (z * sigma_diff / moe) ** 2
 def n_corr(z, r, moe):                           return 3 + (z * (1 - r ** 2) / moe) ** 2
-def n_reg_simple(z, sigma_e, moe, var_x):        return 1 + (z ** 2) * (sigma_e ** 2) / ((moe ** 2) * var_x)
-def n_reg_mult_b(z, sigma_e, moe, var_x, vif):   return 1 + (z ** 2) * (sigma_e ** 2) * vif / ((moe ** 2) * var_x)
+def n_reg_simple(z, sigma_e, moe, var_x):        return 1 + (z ** 2) * sigma_e / ((moe ** 2) * var_x)
+def n_reg_mult_b(z, sigma_e, moe, var_x, vif):   return 1 + (z ** 2) * sigma_e * vif / ((moe ** 2) * var_x)
 def n_reg_mult_beta(z, r2, vif, moe):            return 1 + (z ** 2) * (1 - r2) * vif / (moe ** 2)
 def n_reg_simple_beta(z, beta, moe):             return 3 + (z * (1 - beta ** 2) / moe) ** 2
 def n_reg_mw(z, sigma_e, m, icc, moe, var_t, var_g):
-    return ((z ** 2) * (sigma_e ** 2) * (1 + (m - 1) * icc)) / (m * (moe ** 2) * var_t * var_g)
+    return ((z ** 2) * sigma_e * (1 + (m - 1) * icc)) / (m * (moe ** 2) * var_t * var_g)
 def n_ml_beta(z, sigma_e, m, icc, moe):
-    return ((z ** 2) * (sigma_e ** 2) * (1 + (m - 1) * icc)) / (m * (moe ** 2))
+    return ((z ** 2) * sigma_e * (1 + (m - 1) * icc)) / (m * (moe ** 2))
 
 def n_fuer_design(d, z, inp, moe):
     if d == "mean":            return n_mean(z, inp["sigma"], moe)
@@ -339,7 +339,7 @@ inputs_corr = ui.div(
     ui.input_numeric("corr_moe", "Tolerierbare MOE für r",                          value=0.1,  min=0.0001, step=0.01),
 )
 inputs_reg_simple = ui.div(
-    ui.input_numeric("rs_sigma_e", "Residualvarianz sigma_e", value=2.0,  min=0.0001, step=0.1),
+    ui.input_numeric("rs_sigma_e", "Residualvarianz sigma_e_Quadrat", value=4.0,  min=0.0001, step=0.1),
     ui.input_numeric("rs_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
     ui.input_numeric("rs_moe",     "Tolerierbare MOE für b", value=0.025, min=0.000001, step=0.005),
 )
@@ -348,7 +348,7 @@ inputs_reg_simple_beta = ui.div(
     ui.input_numeric("rsb_moe",  "Tolerierbare MOE für β", value=0.1, min=0.0001, step=0.01),
 )
 inputs_reg_mult_b = ui.div(
-    ui.input_numeric("rmb_sigma_e", "Residualvarianz sigma_e", value=2.0,  min=0.0001, step=0.1),
+    ui.input_numeric("rmb_sigma_e", "Residualvarianz sigma_e_Quadrat", value=4.0,  min=0.0001, step=0.1),
     ui.input_numeric("rmb_var_x",   "Varianz des Prädiktors Var(x)", value=225.0, min=0.0001, step=1.0),
     ui.input_numeric("rmb_vif",     "Variance Inflation Factor (VIF)", value=1.5, min=1.0, step=0.1),
     ui.input_numeric("rmb_moe",     "Tolerierbare MOE für b", value=0.025, min=0.000001, step=0.005),
@@ -359,7 +359,7 @@ inputs_reg_mult_beta = ui.div(
     ui.input_numeric("rmbeta_moe", "Tolerierbare MOE für Beta", value=0.04, min=0.000001, step=0.005),
 )
 inputs_reg_mw = ui.div(
-    ui.input_numeric("rmw_sigma_e", "Residual-Streuung sigma_e", value=2.0, min=0.0001, step=0.1),
+    ui.input_numeric("rmw_sigma_e", "Residualvarianz sigma_e_Quadrat", value=4.0, min=0.0001, step=0.1),
     ui.input_numeric("rmw_m",       "Anzahl Messungen pro Person m", value=2, min=2, step=1),
     ui.input_numeric("rmw_icc",     "Intraklassenkorrelation ICC (0 bis 1)", value=0.5, min=0.0, max=0.999, step=0.05),
     ui.input_numeric("rmw_var_t",   "Varianz der Zeit-Codierung Var(T)", value=0.25, min=0.0001, step=0.05),
@@ -367,7 +367,7 @@ inputs_reg_mw = ui.div(
     ui.input_numeric("rmw_moe",     "Tolerierbare MOE für den Interaktionseffekt", value=1.0, min=0.0001, step=0.1),
 )
 inputs_ml_b = ui.div(
-    ui.input_numeric("mlb_sigma_e", "Residualvarianz sigma_e", value=2.0, min=0.0001, step=0.1),
+    ui.input_numeric("mlb_sigma_e", "Residualvarianz sigma_e_Quadrat", value=4.0, min=0.0001, step=0.1),
     ui.input_numeric("mlb_m",       "Anzahl Ebene-1-Einheiten pro Ebene-2-Einheit m", value=2, min=2, step=1),
     ui.input_numeric("mlb_icc",     "Intraklassenkorrelation ICC (0 bis 1)", value=0.1, min=0.0, max=0.999, step=0.05),
     ui.input_numeric("mlb_var_p1",  "Varianz des Prädiktors auf Ebene 1 Var(P1)", value=0.25, min=0.0001, step=0.05),
@@ -375,7 +375,7 @@ inputs_ml_b = ui.div(
     ui.input_numeric("mlb_moe",     "Tolerierbare MOE für den Interaktionseffekt", value=1.0, min=0.0001, step=0.1),
 )
 inputs_ml_beta = ui.div(
-    ui.input_numeric("mlbeta_sigma_e", "Residualvarianz sigma_e (Standard: 1)", value=1.0, min=0.0001, step=0.1),
+    ui.input_numeric("mlbeta_sigma_e", "Residualvarianz sigma_e_Quadrat (Standard: 1)", value=1.0, min=0.0001, step=0.1),
     ui.input_numeric("mlbeta_m",       "Anzahl Ebene-1-Einheiten pro Ebene-2-Einheit m", value=2, min=2, step=1),
     ui.input_numeric("mlbeta_icc",     "Intraklassenkorrelation ICC (0 bis 1)", value=0.1, min=0.0, max=0.999, step=0.05),
     ui.input_numeric("mlbeta_moe",     "Tolerierbare MOE für den standardisierten Interaktionseffekt", value=0.2, min=0.0001, step=0.01),
